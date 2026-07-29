@@ -23,6 +23,12 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
+# playwright (E2E) の生成物
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # wrangler files
 .wrangler
 .dev.vars*
