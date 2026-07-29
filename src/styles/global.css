@@ -304,12 +304,19 @@ button.primary {
 
 /* --- フレンド --- */
 
-.friends section {
+.friends section,
+.feed-page > section {
 	margin-bottom: 2rem;
 }
 
-.friends h2 {
+.friends h2,
+.feed-page > section h2 {
 	font-size: 1rem;
+	margin: 0 0 0.6rem;
+}
+
+/* 節の説明文は入力欄との間を詰める。 */
+.feed-page > section > .muted {
 	margin: 0 0 0.6rem;
 }
 

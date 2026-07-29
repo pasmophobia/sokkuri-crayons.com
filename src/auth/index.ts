@@ -26,6 +26,15 @@ export const authOptions = {
 		minPasswordLength: 8,
 		autoSignIn: true,
 	},
+	user: {
+		changeEmail: {
+			enabled: true,
+			// メール送信の口がまだ無いので、確認メールを挟まずその場で差し替える。
+			// 効くのは現在のアドレスが未検証のときだけ（検証を導入したら、
+			// 検証済みの利用者は自動的に確認メール経由に切り替わる）。
+			updateEmailWithoutVerification: true,
+		},
+	},
 	plugins: [
 		// ログイン ID はメールのまま。ユーザー名は人を探すための一意な handle。
 		username({

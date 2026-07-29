@@ -1,8 +1,8 @@
 ---
 import { env } from "cloudflare:workers";
 
+import AccountSettings from "../components/AccountSettings";
 import AvatarForm from "../components/AvatarForm";
-import UsernameForm from "../components/UsernameForm";
 import Base from "../layouts/Base.astro";
 
 const user = Astro.locals.user;
@@ -59,11 +59,12 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
 						</dl>
 					</section>
 
-					<section>
-						<h2>ユーザー名</h2>
-						<p class="muted">フレンドを探してもらうときに相手へ伝える名前です。</p>
-						<UsernameForm client:load current={account.username} />
-					</section>
+					<AccountSettings
+						client:load
+						name={account.name}
+						username={account.username}
+						email={account.email}
+					/>
 				</>
 			)
 		}
