@@ -21,6 +21,46 @@ bun run db:migrate               # applies migrations/ to the local D1
 fine for local development; replace them with real ones (`wrangler d1 create
 artc-auth`, `wrangler kv namespace create AUTH_KV`) before deploying.
 
+## Checks
+
+Three checks gate every pull request. `main` is protected, so all three must be
+green before a PR can merge.
+
+```
+bun run lint           # ESLint. `bun run lint:fix` to autofix.
+bun run format:check   # Prettier. `bun run format` to rewrite.
+bun run test           # Vitest, once. `bun run test:watch` to iterate.
+```
+
+ESLint never touches formatting — `eslint-config-prettier` turns those rules off
+at the end of `eslint.config.js`. Conflicts between the two are a config bug, not
+something to work around per file.
+
+Prettier indents with tabs, including JSON, because `bun add` rewrites
+`package.json` with tabs; spaces there would break `format:check` on every
+dependency change. YAML and Markdown are the exceptions.
+
+### Tests
+
+Tests run inside workerd via `@cloudflare/vitest-pool-workers`, not Node. So
+`env` (from `cloudflare:workers`) hands out the real local D1, and the SQL layer
+is tested against actual SQLite rather than a mock. `vitest.config.ts` reads the
+bindings straight from `wrangler.jsonc`, and `src/test/apply-migrations.ts`
+applies `migrations/` before each test file — schemas cannot drift from the app.
+
+Two things to know before adding tests:
+
+- The entry point is `src/test/worker.ts`, not `src/worker.ts`. The real entry
+  imports `@astrojs/cloudflare/handler`, which needs `astro build` output that
+  does not exist at test time. The test entry exists to export the `Post`
+  Durable Object so its binding resolves.
+- Call `resetDb()` from `src/test/seed.ts` in `beforeEach` for anything touching
+  D1. Do not lean on `isolatedStorage` to roll writes back; leaving it implicit
+  makes tests fail when they get reordered.
+
+Astro's `getViteConfig()` is unusable here: `@cloudflare/vite-plugin` rejects the
+`resolve.external` that Vitest sets on the SSR environment.
+
 ## Auth
 
 Email + password via better-auth, stored in D1 with KV as secondary storage.
