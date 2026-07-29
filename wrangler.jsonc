@@ -2,10 +2,7 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-07-29",
 	// Agents SDK が node:async_hooks / node:diagnostics_channel を使う。
-	"compatibility_flags": [
-		"global_fetch_strictly_public",
-		"nodejs_compat"
-	],
+	"compatibility_flags": ["global_fetch_strictly_public", "nodejs_compat"],
 	"name": "sokkuri-crayons",
 	// デプロイ先。複数アカウントに所属していると、これが無い場合に
 	// wrangler が非対話モードで選べず止まる。
@@ -17,8 +14,8 @@
 	"routes": [
 		{
 			"pattern": "sokkuri-crayons.com",
-			"custom_domain": true
-		}
+			"custom_domain": true,
+		},
 	],
 	// 独自ドメインに寄せるので workers.dev の URL は生やさない。
 	// 同じアプリが 2 つの入口から見える状態を避ける。
@@ -42,15 +39,15 @@
 	"kv_namespaces": [
 		{
 			"binding": "AUTH_KV",
-			"id": "0000000000000000000000000000000000"
-		}
+			"id": "0000000000000000000000000000000000",
+		},
 	],
 	// 元画像とアイコン。実体は Terraform が作る。
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
-			"bucket_name": "sokkuri-crayons-media"
-		}
+			"bucket_name": "sokkuri-crayons-media",
+		},
 	],
 	// 確認メール・パスワード再設定の送信 (Cloudflare Email Service)。
 	//
@@ -61,28 +58,26 @@
 	// Email Service に登録することが要る。
 	"send_email": [
 		{
-			"name": "EMAIL"
-		}
+			"name": "EMAIL",
+		},
 	],
 	// 差出人。Email Service に登録したドメインのアドレスであること。
 	"vars": {
-		"MAIL_FROM": "no-reply@sokkuri-crayons.com"
+		"MAIL_FROM": "no-reply@sokkuri-crayons.com",
 	},
 	"durable_objects": {
 		"bindings": [
 			{
 				"name": "Post",
-				"class_name": "Post"
-			}
+				"class_name": "Post",
+			},
 		],
 	},
 	"migrations": [
 		{
 			"tag": "v1",
 			// Agents SDK は SQLite バックエンドの Durable Object を前提にしている。
-			"new_sqlite_classes": [
-				"Post"
-			],
+			"new_sqlite_classes": ["Post"],
 		},
 	],
 	"observability": {

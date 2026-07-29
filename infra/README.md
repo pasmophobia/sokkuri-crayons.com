@@ -6,11 +6,11 @@
 
 Terraform が持つのは**デプロイをまたいで残るもの**だけ。
 
-| リソース | 用途 |
-| --- | --- |
-| D1 `sokkuri-crayons-auth` | better-auth の user / session / account |
-| KV `sokkuri-crayons-auth-kv` | better-auth の secondary storage |
-| R2 `sokkuri-crayons-media` | 投稿の元画像とアイコン |
+| リソース                     | 用途                                    |
+| ---------------------------- | --------------------------------------- |
+| D1 `sokkuri-crayons-auth`    | better-auth の user / session / account |
+| KV `sokkuri-crayons-auth-kv` | better-auth の secondary storage        |
+| R2 `sokkuri-crayons-media`   | 投稿の元画像とアイコン                  |
 
 Worker 本体・Durable Object・バインディングの結線は **wrangler が持つ**。ビルド成果物は
 Astro が吐くので、同じスクリプトを両方から管理すると必ず食い違う。`wrangler.jsonc`
@@ -59,7 +59,7 @@ bun run deploy
 - **`BETTER_AUTH_SECRET`** — `wrangler secret put BETTER_AUTH_SECRET`。
   state に平文で残したくないので Terraform には置かない。
 - **メール送信ドメインの登録** — Cloudflare Email Service（送信）は公開ベータで、
-  Terraform プロバイダにリソースがまだ無い（あるのは Email *Routing* 用のみ）。
+  Terraform プロバイダにリソースがまだ無い（あるのは Email _Routing_ 用のみ）。
   `sokkuri-crayons.com` をダッシュボードから Email Service に登録すると
   MX / SPF / DKIM / DMARC が自動で入る。Workers Paid が要る。
 
