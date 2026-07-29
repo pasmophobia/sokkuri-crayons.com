@@ -54,6 +54,14 @@ export type EditorOptions = {
 	/** サーバへ送る。実体は useAgent が返すソケット。 */
 	send: (message: ClientMessage) => void;
 	onError?: (message: string) => void;
+	/**
+	 * 見せてよい絵が出そろったとき、一度だけ呼ぶ。
+	 *
+	 * 元画像とサーバの初期状態が揃って、それをキャンバスに焼き終えた時点。
+	 * ロード表示を畳むのはここで、それより早く畳むと「元画像だけの絵」を
+	 * 一瞬見せてから op が乗ることになる。
+	 */
+	onReady?: () => void;
 };
 
 /** 点の送信をまとめる間隔。ここを短くすると滑らかになるが通信量が増える。 */
@@ -61,6 +69,14 @@ const EXTEND_INTERVAL_MS = 50;
 
 /** キャンバスの最大幅。元画像がこれより大きければ縮める。 */
 const MAX_CANVAS_WIDTH = 1024;
+
+/**
+ * 初期状態を待つのをあきらめる時間。
+ *
+ * 接続できないままだと `hello` は永遠に来ない。ロード表示を出したまま
+ * 固まるくらいなら、手元にあるもの（元画像だけ）を出したほうがいい。
+ */
+const READY_TIMEOUT_MS = 4000;
 
 export class PostEditor {
 	#canvas: HTMLCanvasElement;
@@ -82,6 +98,12 @@ export class PostEditor {
 	#layer: HTMLCanvasElement | null = null;
 	#layerStale = true;
 
+	/** ロード表示を畳んでよいかの材料。揃って 1 度描いたら `onReady`。 */
+	#imageSettled = false;
+	#stateSettled = false;
+	#ready = false;
+	#readyTimer: ReturnType<typeof setTimeout> | null = null;
+
 	/** いま自分が描いている op。 */
 	#active: { id: string; payload: OpPayload } | null = null;
 	#outbox: Point[] = [];
@@ -95,6 +117,7 @@ export class PostEditor {
 		this.#ctx = ctx;
 		this.#options = options;
 		this.#bindPointer();
+		this.#readyTimer = setTimeout(() => this.#settleState(), READY_TIMEOUT_MS);
 	}
 
 	get signedIn(): boolean {
@@ -110,14 +133,22 @@ export class PostEditor {
 		// CORS が通らない画像はキャンバスを汚染して getImageData が失敗する。
 		const image = new Image();
 		image.crossOrigin = "anonymous";
-		await new Promise<void>((resolve, reject) => {
-			image.onload = () => resolve();
-			image.onerror = () => reject(new Error("画像を読み込めませんでした"));
-			image.src = url;
-		});
+		try {
+			await new Promise<void>((resolve, reject) => {
+				image.onload = () => resolve();
+				image.onerror = () => reject(new Error("画像を読み込めませんでした"));
+				image.src = url;
+			});
+		} catch (error) {
+			// 元画像が無くても op だけは出す。待ち続けても出てくるものはない。
+			this.#imageSettled = true;
+			this.#draw();
+			throw error;
+		}
 
 		this.#resize(Math.min(MAX_CANVAS_WIDTH, image.naturalWidth), aspectRatio);
 		this.#image = image;
+		this.#imageSettled = true;
 		this.#layerStale = true;
 		this.#draw();
 	}
@@ -133,6 +164,7 @@ export class PostEditor {
 	/** キャンバスから離れるときに、抱えているタイマーを落とす。 */
 	dispose(): void {
 		this.#stopExtendTimer();
+		this.#clearReadyTimer();
 		this.#layer = null;
 		this.#layerStale = true;
 	}
@@ -217,9 +249,25 @@ export class PostEditor {
 		this.#committed = new Map(state.committedOps.map((op) => [op.id, op]));
 		this.#pending = new Map(state.pendingOps.map((op) => [op.id, op]));
 		this.#layerStale = true;
+		this.#settleState();
 		// 自分が描いている最中の op はサーバの flush より新しいことがあるので、
 		// 手元のものを残しておく。
 		this.#draw();
+	}
+
+	// --- ロード表示 ---
+
+	#settleState(): void {
+		this.#clearReadyTimer();
+		if (this.#stateSettled) return;
+		this.#stateSettled = true;
+		this.#draw();
+	}
+
+	#clearReadyTimer(): void {
+		if (this.#readyTimer === null) return;
+		clearTimeout(this.#readyTimer);
+		this.#readyTimer = null;
 	}
 
 	// --- 描画 ---
@@ -240,19 +288,27 @@ export class PostEditor {
 		}
 
 		const layer = this.#committedLayer();
-		if (!layer) {
+		if (layer) {
+			const ctx = this.#ctx;
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.globalCompositeOperation = "source-over";
+			ctx.clearRect(0, 0, layer.width, layer.height);
+			// 同じ寸法・等倍・透明な下地の上なので、これは画素の複写になる。
+			ctx.drawImage(layer, 0, 0);
+			applyOps(ctx, this.#renderable([], [...this.#pending.values()]));
+		} else {
 			// 下地を用意できないときは、その場で全部焼く。
 			renderPost(this.#ctx, this.#image, renderableOps(this.#snapshot()));
-			return;
 		}
 
-		const ctx = this.#ctx;
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.globalCompositeOperation = "source-over";
-		ctx.clearRect(0, 0, layer.width, layer.height);
-		// 同じ寸法・等倍・透明な下地の上なので、これは画素の複写になる。
-		ctx.drawImage(layer, 0, 0);
-		applyOps(ctx, this.#renderable([], [...this.#pending.values()]));
+		this.#announceReady();
+	}
+
+	/** 焼き終えた直後に 1 度だけ。ここより早く知らせると、途中の絵が出てしまう。 */
+	#announceReady(): void {
+		if (this.#ready || !this.#imageSettled || !this.#stateSettled) return;
+		this.#ready = true;
+		this.#options.onReady?.();
 	}
 
 	/** 元画像と確定済み op を焼いた下地。作れないときだけ null。 */
