@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 
-import { isReadableMediaKey, THUMBS_PREFIX } from "../../../lib/media";
+import { isReadableMediaKey } from "../../../lib/media";
 
 export const prerender = false;
 
@@ -22,11 +22,8 @@ export const GET: APIRoute = async ({ params, request }) => {
 	const headers = new Headers();
 	object.writeHttpMetadata(headers);
 	headers.set("etag", object.httpEtag);
-	// 元画像は不変。サムネイルは焼き直されるので、URL の ?v= で世代を切り替える。
-	headers.set(
-		"cache-control",
-		key.startsWith(THUMBS_PREFIX) ? "public, max-age=60" : "public, max-age=31536000, immutable",
-	);
+	// 元画像は差し替わらない。落書きは op として別に配るので、ここは不変で良い。
+	headers.set("cache-control", "public, max-age=31536000, immutable");
 
 	// onlyIf が効いた場合は body を持たない = 中身は変わっていない。
 	if (!("body" in object) || object.body === null) {

@@ -22,7 +22,6 @@ import type {
 } from "../agents/post/ops";
 import { renderableOps } from "../agents/post/ops";
 import type { ClientMessage, ServerMessage } from "../agents/post/protocol";
-import { THUMBNAIL_MAX_WIDTH, THUMBNAIL_TYPE } from "./media";
 import { renderPost } from "./render";
 
 export type Tool = "stroke" | "displace" | "text";
@@ -50,9 +49,6 @@ export const DEFAULT_SETTINGS: EditorSettings = {
 };
 
 export type EditorOptions = {
-	postId: string;
-	/** サムネイルを最後に焼いた時刻（サーバ時刻）。null なら未生成。 */
-	thumbnailUpdatedAt: number | null;
 	/** 描く直前に呼ばれる。設定は React 側が持つので、常に最新を読みに行く。 */
 	getSettings: () => EditorSettings;
 	/** サーバへ送る。実体は useAgent が返すソケット。 */
@@ -62,9 +58,6 @@ export type EditorOptions = {
 
 /** 点の送信をまとめる間隔。ここを短くすると滑らかになるが通信量が増える。 */
 const EXTEND_INTERVAL_MS = 50;
-
-/** 編集が落ち着いてからサムネイルを焼くまでの待ち時間。 */
-const THUMBNAIL_DEBOUNCE_MS = 4000;
 
 /** キャンバスの最大幅。元画像がこれより大きければ縮める。 */
 const MAX_CANVAS_WIDTH = 1024;
@@ -84,10 +77,6 @@ export class PostEditor {
 	#outbox: Point[] = [];
 	#extendTimer: ReturnType<typeof setInterval> | null = null;
 	#frame = 0;
-	#thumbnailTimer: ReturnType<typeof setTimeout> | null = null;
-	/** サーバのサムネイルに未反映の変更があるか。焼けたら下ろす。 */
-	#thumbnailDirty = false;
-	#thumbnailUpdatedAt: number | null;
 
 	constructor(canvas: HTMLCanvasElement, options: EditorOptions) {
 		this.#canvas = canvas;
@@ -95,7 +84,6 @@ export class PostEditor {
 		if (!ctx) throw new Error("2d context is unavailable");
 		this.#ctx = ctx;
 		this.#options = options;
-		this.#thumbnailUpdatedAt = options.thumbnailUpdatedAt;
 		this.#bindPointer();
 	}
 
@@ -121,8 +109,6 @@ export class PostEditor {
 		this.#resize(Math.min(MAX_CANVAS_WIDTH, image.naturalWidth), aspectRatio);
 		this.#image = image;
 		this.#draw();
-		// 画像待ちで焼くのを見送っていた分をここで拾う。
-		this.#scheduleThumbnail(THUMBNAIL_DEBOUNCE_MS);
 	}
 
 	/** キャンバスの実ピクセル寸法を決める。幅を変えると中身は消えるので描き直す。 */
@@ -135,8 +121,6 @@ export class PostEditor {
 	/** キャンバスから離れるときに、抱えているタイマーを落とす。 */
 	dispose(): void {
 		this.#stopExtendTimer();
-		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
-		this.#thumbnailTimer = null;
 	}
 
 	/** 接続が切れたとき。送っても届かないので点の送出を止める。 */
@@ -176,9 +160,6 @@ export class PostEditor {
 			case "hello": {
 				this.#userId = message.you;
 				this.#sync(message.state);
-				// サムネイルより新しい op があるなら、開いた時点で焼き直す。
-				// これがないと、編集した本人が去ったあと誰も焼き直さない。
-				if (this.#thumbnailIsStale()) this.#markThumbnailStale();
 				return;
 			}
 
@@ -196,7 +177,6 @@ export class PostEditor {
 			case "op:committed":
 				this.#pending.delete(message.op.id);
 				this.#committed.set(message.op.id, message.op);
-				this.#markThumbnailStale();
 				return this.#draw();
 
 			case "op:cancelled":
@@ -206,7 +186,6 @@ export class PostEditor {
 			case "op:undone": {
 				const op = this.#committed.get(message.id);
 				if (op) op.undone = true;
-				this.#markThumbnailStale();
 				return this.#draw();
 			}
 
@@ -251,89 +230,6 @@ export class PostEditor {
 			committedOps: [...this.#committed.values()],
 			pendingOps: [...this.#pending.values()],
 		};
-	}
-
-	// --- サムネイル ---
-
-	/** サーバのサムネイルより新しい op を持っているか。 */
-	#thumbnailIsStale(): boolean {
-		let newest = 0;
-		for (const op of this.#committed.values()) {
-			if (op.committedAt > newest) newest = op.committedAt;
-		}
-		if (newest === 0) return false;
-		return this.#thumbnailUpdatedAt === null || newest > this.#thumbnailUpdatedAt;
-	}
-
-	#markThumbnailStale(): void {
-		this.#thumbnailDirty = true;
-		this.#scheduleThumbnail(THUMBNAIL_DEBOUNCE_MS);
-	}
-
-	/**
-	 * 編集が落ち着いたら、いまのキャンバスを縮小して一覧用に焼き直す。
-	 *
-	 * Workers に Canvas が無く op を再生できるのはブラウザだけなので、
-	 * 描画済みのこちらから上げる。開いている全員が上げに来るが、権利を取れるのは
-	 * 1 人だけ。取れなかった側は焼けていない変更を抱えたまま待ち、間隔が明けたら
-	 * 出し直す（焼けたら #thumbnailDirty が下りて止まる）。
-	 */
-	#scheduleThumbnail(delayMs: number): void {
-		if (!this.signedIn || !this.#thumbnailDirty) return;
-		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
-		this.#thumbnailTimer = setTimeout(() => {
-			this.#thumbnailTimer = null;
-			void this.#pushThumbnail();
-		}, delayMs);
-	}
-
-	async #pushThumbnail(): Promise<void> {
-		const postId = this.#options.postId;
-		if (!this.#thumbnailDirty) return;
-
-		// 元画像が載る前に焼くと、背景の抜けた既定寸法 (300x150) のサムネイルが
-		// 残る。しかも時刻だけは新しくなるので、以後どのクライアントも
-		// 古いとみなさず直しに来ない。画像が揃うまでは焼かない。
-		if (!this.#image) return;
-
-		// 待っている間に描画が rAF 待ちのまま止まっていることがある
-		// （背景タブでは rAF が回らない）。焼く直前に必ず追いつかせる。
-		this.#renderNow();
-
-		const source = this.#canvas;
-		const scale = Math.min(1, THUMBNAIL_MAX_WIDTH / source.width);
-		const thumb = document.createElement("canvas");
-		thumb.width = Math.max(1, Math.round(source.width * scale));
-		thumb.height = Math.max(1, Math.round(source.height * scale));
-		thumb.getContext("2d")?.drawImage(source, 0, 0, thumb.width, thumb.height);
-
-		const blob = await new Promise<Blob | null>((resolve) =>
-			thumb.toBlob(resolve, THUMBNAIL_TYPE, 0.8),
-		);
-		if (!blob) return;
-
-		try {
-			const response = await fetch(`/api/posts/${postId}/thumbnail`, {
-				method: "PUT",
-				headers: { "content-type": THUMBNAIL_TYPE },
-				body: blob,
-			});
-
-			if (response.ok) {
-				this.#thumbnailDirty = false;
-				this.#thumbnailUpdatedAt = Date.now();
-				return;
-			}
-
-			// 他の誰かが直前に焼いた。こちらの変更はまだ載っていないかもしれないので、
-			// 間隔が明けたら出し直す。同時に待っている全員が同じ瞬間に殺到しないよう散らす。
-			if (response.status === 429) {
-				const retryAfterMs = Number(response.headers.get("retry-after") ?? 30) * 1000;
-				this.#scheduleThumbnail(retryAfterMs + Math.random() * 3000);
-			}
-		} catch {
-			// 一覧の見た目が少し古くなるだけなので、失敗しても編集は続行させる。
-		}
 	}
 
 	// --- 入力 ---

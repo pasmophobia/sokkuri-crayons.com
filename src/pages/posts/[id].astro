@@ -23,7 +23,6 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 		postId={post.id}
 		imageUrl={mediaUrl(post.imageKey)}
 		aspectRatio={post.aspectRatio}
-		thumbnailUpdatedAt={post.thumbnailUpdatedAt}
 		canEdit={user !== null}
 	/>
 </Base>

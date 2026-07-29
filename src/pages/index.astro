@@ -1,8 +1,9 @@
 ---
 import { env } from "cloudflare:workers";
 
+import FeedThumbnail from "../components/FeedThumbnail";
 import Base from "../layouts/Base.astro";
-import { mediaUrl, thumbnailKey } from "../lib/media";
+import { mediaUrl } from "../lib/media";
 import { listPosts } from "../lib/posts";
 
 const posts = await listPosts(env.DB);
@@ -28,16 +29,13 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 				{posts.map((post) => (
 					<li class="card">
 						<a href={`/posts/${post.id}`}>
-							{/* 落書きを焼き込んだサムネイル。まだ焼かれていなければ元画像。 */}
-							<img
-								src={
-									post.thumbnailUpdatedAt
-										? mediaUrl(thumbnailKey(post.id), post.thumbnailUpdatedAt)
-										: mediaUrl(post.imageKey)
-								}
-								alt={post.caption}
-								loading="lazy"
-								style={`aspect-ratio: ${post.aspectRatio}`}
+							{/* 落書きは見る側のブラウザがその場で描く。画面に入った分だけ。 */}
+							<FeedThumbnail
+								client:visible
+								postId={post.id}
+								imageUrl={mediaUrl(post.imageKey)}
+								aspectRatio={post.aspectRatio}
+								caption={post.caption}
 							/>
 							<div class="meta">
 								<div class="caption">{post.caption || "（キャプションなし）"}</div>

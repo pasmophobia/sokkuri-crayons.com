@@ -162,15 +162,27 @@ button.primary {
 /*
  * 比率は投稿ごとに違うので、一律に切り抜かない。落書きは端に描かれることが
  * 多く、cover で切ると「何が描かれたか」が一覧から消えてしまう。
- * aspect-ratio は各要素が実比率をインラインで持つ（縦長すぎるものだけ
- * max-height が効き、そのときは contain なので切れずに余白になる）。
+ * 実比率は .thumb がインラインで持つ（縦長すぎるものだけ max-height が効き、
+ * そのときは contain なので切れずに余白になる）。
  */
-.feed img {
+.thumb {
+	display: block;
+	background: var(--surface-2);
+}
+
+.thumb img,
+.thumb canvas {
 	display: block;
 	width: 100%;
 	max-height: 26rem;
 	object-fit: contain;
-	background: var(--surface-2);
+}
+
+/* display:block が UA の [hidden] { display: none } に勝ってしまうので明示する。
+   これがないと元画像と描画後のキャンバスが二重に積まれる。 */
+.thumb img[hidden],
+.thumb canvas[hidden] {
+	display: none;
 }
 
 .feed .meta {

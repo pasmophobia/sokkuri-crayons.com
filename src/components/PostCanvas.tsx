@@ -21,7 +21,6 @@ type Props = {
 	postId: string;
 	imageUrl: string;
 	aspectRatio: number;
-	thumbnailUpdatedAt: number | null;
 	/** 未ログインなら閲覧のみ。道具は出さない。 */
 	canEdit: boolean;
 };
@@ -50,7 +49,6 @@ export default function PostCanvas({
 	postId,
 	imageUrl,
 	aspectRatio,
-	thumbnailUpdatedAt,
 	canEdit,
 }: Props) {
 	const editorRef = useRef<PostEditor | null>(null);
@@ -89,8 +87,6 @@ export default function PostCanvas({
 			if (!canvas) return;
 
 			const editor = new PostEditor(canvas, {
-				postId,
-				thumbnailUpdatedAt,
 				getSettings: () => settingsRef.current,
 				send: (message) => agentRef.current.send(JSON.stringify(message)),
 				onError: setError,
@@ -106,7 +102,7 @@ export default function PostCanvas({
 				editorRef.current = null;
 			};
 		},
-		[postId, imageUrl, aspectRatio, thumbnailUpdatedAt],
+		[imageUrl, aspectRatio],
 	);
 
 	const update = <K extends keyof EditorSettings>(key: K, value: EditorSettings[K]) =>

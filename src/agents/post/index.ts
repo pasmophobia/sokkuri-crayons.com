@@ -158,6 +158,14 @@ export class Post extends Agent<Env, PostState> {
 	}
 
 	/**
+	 * 一覧のサムネイル描画用 (Durable Object RPC)。
+	 * 取り消し済みを除いた確定 op を描画順で返す。編集中のものは含めない。
+	 */
+	async listCommittedOps(): Promise<CommittedOp[]> {
+		return this.#committed.filter((op) => !op.undone).sort((a, b) => a.seq - b.seq);
+	}
+
+	/**
 	 * 投稿作成時に `POST /api/posts` から 1 度だけ呼ばれる (Durable Object RPC)。
 	 * メタ情報をクライアントに作らせないための、サーバ専用の入口。
 	 * 冪等 — 既に初期化済みなら何もしない。

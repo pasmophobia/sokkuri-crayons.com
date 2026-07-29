@@ -9,8 +9,6 @@ import type { PostMeta } from "../agents/post/ops";
 export type PostRow = PostMeta & {
 	id: string;
 	authorName: string;
-	/** サムネイルを最後に焼いた時刻。null なら未生成。 */
-	thumbnailUpdatedAt: number | null;
 };
 
 type PostRecord = {
@@ -21,12 +19,11 @@ type PostRecord = {
 	aspectRatio: number;
 	caption: string;
 	createdAt: number;
-	thumbnailUpdatedAt: number | null;
 };
 
 const SELECT = `
 	select p."id", p."authorId", u."name" as "authorName", p."imageKey",
-	       p."aspectRatio", p."caption", p."createdAt", p."thumbnailUpdatedAt"
+	       p."aspectRatio", p."caption", p."createdAt"
 	from "post" p
 	join "user" u on u."id" = p."authorId"
 `;
@@ -40,7 +37,6 @@ function toRow(record: PostRecord): PostRow {
 		aspectRatio: record.aspectRatio,
 		caption: record.caption,
 		createdAt: record.createdAt,
-		thumbnailUpdatedAt: record.thumbnailUpdatedAt,
 	};
 }
 
@@ -68,45 +64,4 @@ export async function insertPost(
 		)
 		.bind(input.id, input.authorId, input.imageKey, input.aspectRatio, input.caption, Date.now())
 		.run();
-}
-
-export type ThumbnailClaim =
-	| { claimed: true }
-	| { claimed: false; thumbnailUpdatedAt: number | null; retryAfterMs: number };
-
-/**
- * サムネイルを焼く権利を取る。同じ投稿を見ている全クライアントが一斉に
- * 焼きに来るのを間引くため、直近に焼かれたばかりなら取れない。
- *
- * 取れなかった側には「いつなら焼けるか」を返す。ここを黙って捨てると、
- * 編集セッションの最後の一枚 —— 一番新しくて一番重要なやつ —— が
- * 落ちたまま誰も焼き直さない。
- */
-export async function claimThumbnail(
-	db: D1Database,
-	postId: string,
-	minIntervalMs: number,
-): Promise<ThumbnailClaim> {
-	const now = Date.now();
-	const { meta } = await db
-		.prepare(
-			`update "post" set "thumbnailUpdatedAt" = ?2
-			 where "id" = ?1
-			   and ("thumbnailUpdatedAt" is null or "thumbnailUpdatedAt" < ?3)`,
-		)
-		.bind(postId, now, now - minIntervalMs)
-		.run();
-	if ((meta.changes ?? 0) > 0) return { claimed: true };
-
-	const row = await db
-		.prepare(`select "thumbnailUpdatedAt" from "post" where "id" = ?1`)
-		.bind(postId)
-		.first<{ thumbnailUpdatedAt: number | null }>();
-	const last = row?.thumbnailUpdatedAt ?? null;
-
-	return {
-		claimed: false,
-		thumbnailUpdatedAt: last,
-		retryAfterMs: last === null ? minIntervalMs : Math.max(0, last + minIntervalMs - now),
-	};
 }
