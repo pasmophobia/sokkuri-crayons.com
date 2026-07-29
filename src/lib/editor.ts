@@ -66,6 +66,9 @@ const EXTEND_INTERVAL_MS = 50;
 /** 編集が落ち着いてからサムネイルを焼くまでの待ち時間。 */
 const THUMBNAIL_DEBOUNCE_MS = 4000;
 
+/** キャンバスの最大幅。元画像がこれより大きければ縮める。 */
+const MAX_CANVAS_WIDTH = 1024;
+
 export class PostEditor {
 	#canvas: HTMLCanvasElement;
 	#ctx: CanvasRenderingContext2D;
@@ -101,6 +104,10 @@ export class PostEditor {
 	}
 
 	async loadImage(url: string, aspectRatio: number): Promise<void> {
+		// 画像を待つ前に寸法を確定させておく。こうしておけば、画像が読めなくても
+		// 履歴の op はキャンバスに出る（真っ白にならない）。
+		this.#resize(MAX_CANVAS_WIDTH, aspectRatio);
+
 		// 元画像に落書きを重ねた結果を読み戻す（ディスプレイスメント）ので、
 		// CORS が通らない画像はキャンバスを汚染して getImageData が失敗する。
 		const image = new Image();
@@ -111,10 +118,15 @@ export class PostEditor {
 			image.src = url;
 		});
 
-		const width = Math.min(1024, image.naturalWidth);
+		this.#resize(Math.min(MAX_CANVAS_WIDTH, image.naturalWidth), aspectRatio);
+		this.#image = image;
+		this.#draw();
+	}
+
+	/** キャンバスの実ピクセル寸法を決める。幅を変えると中身は消えるので描き直す。 */
+	#resize(width: number, aspectRatio: number): void {
 		this.#canvas.width = width;
 		this.#canvas.height = Math.round(width / (aspectRatio || 1));
-		this.#image = image;
 		this.#draw();
 	}
 

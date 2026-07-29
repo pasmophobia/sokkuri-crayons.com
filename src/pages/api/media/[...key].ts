@@ -16,11 +16,9 @@ export const GET: APIRoute = async ({ params, request }) => {
 		return new Response(null, { status: 404 });
 	}
 
-	const object = await env.MEDIA.get(key, {
-		onlyIf: request.headers.get("if-none-match")
-			? { etagDoesNotMatch: request.headers.get("if-none-match")! }
-			: undefined,
-	});
+	// 条件付きヘッダはそのまま R2 に渡して解釈させる。自前で If-None-Match を
+	// 組み替えると、ブラウザが送る引用符付き ETag を R2 が受け付けず 500 になる。
+	const object = await env.MEDIA.get(key, { onlyIf: request.headers });
 	if (!object) return new Response(null, { status: 404 });
 
 	const headers = new Headers();
