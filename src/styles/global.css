@@ -335,6 +335,23 @@ button.primary {
 	font-size: 0.9rem;
 }
 
+.my-handle {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	margin-bottom: 0.4rem;
+}
+
+.my-handle code {
+	font-size: 1.1rem;
+	font-weight: 700;
+	color: var(--text);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.35rem 0.7rem;
+}
+
 .people .who {
 	display: flex;
 	align-items: center;

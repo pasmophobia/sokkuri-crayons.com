@@ -10,6 +10,8 @@ import type { Friend, FriendRequest } from "../lib/friends";
 import { mediaUrl } from "../lib/media";
 
 type Props = {
+	/** 自分のフレンド ID。相手に伝えるために出す。未設定なら null。 */
+	myHandle: string | null;
 	friends: Friend[];
 	incoming: FriendRequest[];
 	outgoing: FriendRequest[];
@@ -19,7 +21,8 @@ type Action =
 	| { action: "request"; username: string }
 	| { action: "accept" | "decline" | "remove"; userId: string };
 
-export default function FriendManager({ friends, incoming, outgoing }: Props) {
+export default function FriendManager({ myHandle, friends, incoming, outgoing }: Props) {
+	const [copied, setCopied] = useState(false);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
@@ -54,6 +57,31 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 
 	return (
 		<div className="friends">
+			<section>
+				<h2>あなたのフレンド ID</h2>
+				{myHandle ? (
+					<div className="my-handle">
+						<code>@{myHandle}</code>
+						<button
+							type="button"
+							onClick={async () => {
+								await navigator.clipboard.writeText(`@${myHandle}`);
+								setCopied(true);
+								setTimeout(() => setCopied(false), 2000);
+							}}
+						>
+							{copied ? "コピーしました" : "コピー"}
+						</button>
+					</div>
+				) : (
+					<p className="muted">
+						まだ設定されていません。<a href="/settings">アカウント</a>で決めると、
+						相手から探してもらえるようになります。
+					</p>
+				)}
+				<p className="muted">これを相手に伝えると、フレンド申請してもらえます。</p>
+			</section>
+
 			<section>
 				<h2>フレンドを追加</h2>
 				<form

@@ -8,16 +8,27 @@ import { listFriends, listIncomingRequests, listOutgoingRequests } from "../lib/
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/signin");
 
-const [friends, incoming, outgoing] = await Promise.all([
+const [friends, incoming, outgoing, me] = await Promise.all([
 	listFriends(env.DB, user.id),
 	listIncomingRequests(env.DB, user.id),
 	listOutgoingRequests(env.DB, user.id),
+	env.DB.prepare(
+		`select coalesce("displayUsername", "username") as "handle" from "user" where "id" = ?1`,
+	)
+		.bind(user.id)
+		.first<{ handle: string | null }>(),
 ]);
 ---
 
 <Base title="フレンド">
 	<div class="feed-page">
 		<h1>フレンド</h1>
-		<FriendManager client:load friends={friends} incoming={incoming} outgoing={outgoing} />
+		<FriendManager
+			client:load
+			myHandle={me?.handle ?? null}
+			friends={friends}
+			incoming={incoming}
+			outgoing={outgoing}
+		/>
 	</div>
 </Base>
