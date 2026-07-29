@@ -117,7 +117,9 @@ so simultaneous sign-ups cannot be mixed up.
 ## Auth
 
 Email + password via better-auth, stored in D1 with KV as secondary storage.
-Email verification is off — there is no mail transport yet.
+Sign-up sends a confirmation mail and the address has to be confirmed before the
+first sign-in. Confirming signs the account in on the spot, so nobody is sent
+back to the login form. Where that mail goes is under Mail below.
 
 `src/auth/index.ts` holds the runtime config. `auth.config.ts` at the repo root
 exists only for `@better-auth/cli`, which cannot see Cloudflare bindings; it
