@@ -37,7 +37,28 @@ const p = (path: string) => localePath(locale, path);
 	<body>
 		<header class="site-header">
 			<a class="brand" href={p("/")}>{t("common.brand")}</a>
-			<nav>
+			{
+				/*
+			  開閉の文言は下のスクリプトが差し替える。あちらはバンドルされるモジュールで
+			  Astro.locals を見られないので、data 属性で渡しておく。
+			*/
+			}
+			<button
+				class="nav-toggle"
+				type="button"
+				aria-controls="site-nav"
+				aria-expanded="false"
+				aria-label={t("nav.menuOpen")}
+				data-label-open={t("nav.menuOpen")}
+				data-label-close={t("nav.menuClose")}
+			>
+				<span class="nav-toggle-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+			</button>
+			<nav id="site-nav">
 				{
 					user ? (
 						<>
@@ -87,6 +108,7 @@ const p = (path: string) => localePath(locale, path);
 							</>
 						)
 					}
+					<a href={p("/statement")}>{t("nav.statement")}</a>
 					<a href={p("/privacy")}>{t("nav.privacy")}</a>
 				</nav>
 				{
@@ -113,5 +135,40 @@ const p = (path: string) => localePath(locale, path);
 			</div>
 			<p class="copyright">© 2026 pasmophobia. All rights reserved.</p>
 		</footer>
+		<script>
+			// ハンバーガーの開閉。開いた状態はヘッダーの data 属性だけで表し、
+			// 表示の切り替えはメディアクエリ側に任せる。
+			const header = document.querySelector<HTMLElement>(".site-header");
+			const toggle = header?.querySelector<HTMLButtonElement>(".nav-toggle");
+
+			if (header && toggle) {
+				// 文言はサーバが data 属性に載せている（ここは言語を知らない）。
+				const openLabel = toggle.dataset.labelOpen ?? "";
+				const closeLabel = toggle.dataset.labelClose ?? "";
+
+				const setOpen = (open: boolean) => {
+					header.toggleAttribute("data-nav-open", open);
+					toggle.setAttribute("aria-expanded", String(open));
+					toggle.setAttribute("aria-label", open ? closeLabel : openLabel);
+				};
+
+				toggle.addEventListener("click", () => {
+					setOpen(!header.hasAttribute("data-nav-open"));
+				});
+
+				document.addEventListener("keydown", (event) => {
+					if (event.key === "Escape" && header.hasAttribute("data-nav-open")) {
+						setOpen(false);
+						toggle.focus();
+					}
+				});
+
+				// 横幅が広がるとナビは常時表示に戻るので、開いた状態を持ち越さない。
+				const wide = window.matchMedia("(min-width: 48rem)");
+				wide.addEventListener("change", (event) => {
+					if (event.matches) setOpen(false);
+				});
+			}
+		</script>
 	</body>
 </html>

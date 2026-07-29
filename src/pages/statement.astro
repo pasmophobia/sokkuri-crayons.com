@@ -1,0 +1,17 @@
+---
+import { useTranslations } from "../i18n";
+import Base from "../layouts/Base.astro";
+
+const t = useTranslations(Astro.locals.locale);
+---
+
+<Base title={t("statement.title")}>
+	<div class="prose">
+		<h1>{t("statement.title")}</h1>
+
+		<p>{t("statement.p1")}</p>
+		<p>{t("statement.p2")}</p>
+		<p>{t("statement.p3")}</p>
+		<p>{t("statement.p4")}</p>
+	</div>
+</Base>

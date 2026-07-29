@@ -18,7 +18,10 @@ export const en: Messages = {
 	"nav.signIn": "Sign in",
 	"nav.signUp": "Sign up",
 	"nav.signOut": "Sign out",
+	"nav.statement": "Statement",
 	"nav.privacy": "Privacy policy",
+	"nav.menuOpen": "Open the menu",
+	"nav.menuClose": "Close the menu",
 
 	"footer.tagline":
 		"A small place for tracing over photos with scribbles and warps, and sharing them with friends.",
@@ -212,6 +215,16 @@ export const en: Messages = {
 	"friendsError.noSuchRequest": "There is no such request",
 
 	"postsError.notOwner": "You can only delete your own posts",
+
+	"statement.title": "Statement",
+	"statement.p1":
+		"This website is a social network that implements the Sokkuri Crayon, one of the secret gadgets from the manga Doraemon. The Sokkuri Crayon makes whatever you sketch take on the appearance of the drawing. In the story, after Suneo mocks a picture Nobita has drawn, Nobita uses the gadget to leave Suneo's face a scrambled mess.",
+	"statement.p2":
+		"I take this gadget to stand for the human desire to remake reality to match one's own will. But were many people to hold it at once, reality would be rewritten without limit by all of them, and would become profoundly chaotic. What interests me is where that chaos ends up: a world in which the desires of all humanity are satisfied equally, or a ruinous one in which those desires collide.",
+	"statement.p3":
+		"This work therefore reinterprets the Sokkuri Crayon as a social network, and implements it. Here anyone may freely scribble on and deform anyone else's post, and every edit is shared with the whole world in real time. A post is therefore not the work of any particular individual: it changes ceaselessly through the intervention of users everywhere.",
+	"statement.p4":
+		"What this work examines is whether, in a place where the work of others can be altered freely, people's actions tend toward collaborative creation or toward a chain of vandalism and destruction.",
 
 	"privacy.title": "Privacy policy",
 	"privacy.updated": "Last updated: {date}",
