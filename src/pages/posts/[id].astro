@@ -1,6 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 
+import DeletePostButton from "../../components/DeletePostButton";
 import PostCanvas from "../../components/PostCanvas";
 import Base from "../../layouts/Base.astro";
 import { mediaUrl } from "../../lib/media";
@@ -36,4 +37,6 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 		aspectRatio={post.aspectRatio}
 		canEdit={user !== null}
 	/>
+
+	{user?.id === post.authorId && <DeletePostButton client:load postId={post.id} />}
 </Base>
