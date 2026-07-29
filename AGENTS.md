@@ -23,11 +23,12 @@ artc-auth`, `wrangler kv namespace create AUTH_KV`) before deploying.
 
 ## Checks
 
-Three checks gate every pull request. `main` is protected, so all three must be
+Four checks gate every pull request. `main` is protected, so all four must be
 green before a PR can merge.
 
 ```
 bun run lint           # ESLint. `bun run lint:fix` to autofix.
+bun run typecheck      # astro check — .astro, .ts, and .tsx together.
 bun run format:check   # Prettier. `bun run format` to rewrite.
 bun run test           # Vitest, once. `bun run test:watch` to iterate.
 ```
@@ -35,6 +36,9 @@ bun run test           # Vitest, once. `bun run test:watch` to iterate.
 ESLint never touches formatting — `eslint-config-prettier` turns those rules off
 at the end of `eslint.config.js`. Conflicts between the two are a config bug, not
 something to work around per file.
+
+`astro check` fails on errors only; warnings and hints are reported but do not
+gate. It generates `.astro/types.d.ts` first, so it works on a clean checkout.
 
 Prettier indents with tabs, including JSON, because `bun add` rewrites
 `package.json` with tabs; spaces there would break `format:check` on every
@@ -57,6 +61,10 @@ Two things to know before adding tests:
 - Call `resetDb()` from `src/test/seed.ts` in `beforeEach` for anything touching
   D1. Do not lean on `isolatedStorage` to roll writes back; leaving it implicit
   makes tests fail when they get reordered.
+- Keep test-only bindings out of `Cloudflare.Env`. Declaring `TEST_MIGRATIONS`
+  there makes the real `Env` stop satisfying `Cloudflare.Env`, and every
+  `Agent<Env, …>` and `getAgentByName<Env, …>` in the app fails to typecheck.
+  `src/test/apply-migrations.ts` casts for it locally instead.
 
 Astro's `getViteConfig()` is unusable here: `@cloudflare/vite-plugin` rejects the
 `resolve.external` that Vitest sets on the SSR environment.

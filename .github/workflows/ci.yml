@@ -25,6 +25,19 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
 
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      # `astro check` は先に `astro sync` を走らせて .astro/types.d.ts を作る。
+      # アダプタは読み込まれるが、Cloudflare への接続は要らない。
+      - run: bun run typecheck
+
   format-check:
     name: format-check
     runs-on: ubuntu-latest

@@ -1,12 +1,6 @@
 /// <reference types="@cloudflare/vitest-pool-workers/types" />
 
-import type { D1Migration } from "@cloudflare/vitest-pool-workers";
-
-declare global {
-	namespace Cloudflare {
-		interface Env {
-			/** `vitest.config.ts` が `migrations/` を読んで注入する。テスト時のみ存在。 */
-			TEST_MIGRATIONS: D1Migration[];
-		}
-	}
-}
+// `cloudflare:test` の型だけを読み込む。テスト専用のバインディング
+// (`TEST_MIGRATIONS`) をここで `Cloudflare.Env` に足してはいけない。足すと本番の
+// `Env` が `Cloudflare.Env` を満たさなくなり、`Agent<Env, …>` が型エラーになる。
+// 受け取りは `src/test/apply-migrations.ts` の中に閉じ込めてある。

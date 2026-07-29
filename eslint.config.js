@@ -7,13 +7,16 @@
  */
 
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import astro from "eslint-plugin-astro";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import prettier from "eslint-config-prettier/flat";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+// `tseslint.config()` ではなく ESLint 本体の `defineConfig()` を使う。
+// typescript-eslint 8 で前者は非推奨になった。
+export default defineConfig(
 	{
 		ignores: ["dist/", ".astro/", ".wrangler/", "worker-configuration.d.ts", "auth.schema.sql"],
 	},
