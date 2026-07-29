@@ -16,8 +16,13 @@
 	box-sizing: border-box;
 }
 
+/* 投稿が少ないページでもフッターが中途半端な高さに浮かないよう、
+   縦一列に積んで main を伸ばす。 */
 body {
 	margin: 0;
+	min-height: 100dvh;
+	display: flex;
+	flex-direction: column;
 	background: var(--bg);
 	color: var(--text);
 	font-family: ui-sans-serif, system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -60,9 +65,86 @@ a:hover {
 }
 
 main {
+	width: 100%;
 	max-width: 60rem;
 	margin: 0 auto;
 	padding: 1.5rem 1.25rem 4rem;
+	flex: 1;
+}
+
+.site-footer {
+	border-top: 1px solid var(--border);
+	background: var(--surface);
+	padding: 1.75rem 1.25rem 2rem;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.site-footer .footer-inner {
+	max-width: 60rem;
+	margin: 0 auto;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem 2.5rem;
+	justify-content: space-between;
+}
+
+.site-footer .brand {
+	display: block;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--accent);
+}
+
+.footer-about {
+	max-width: 22rem;
+}
+
+.footer-about p {
+	margin: 0.35rem 0 0;
+}
+
+.footer-links {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.copyright {
+	max-width: 60rem;
+	margin: 1.75rem auto 0;
+	padding-top: 1rem;
+	border-top: 1px solid var(--border);
+	font-size: 0.8rem;
+}
+
+/* --- 規約・ポリシーの本文 --- */
+
+.prose {
+	max-width: var(--feed-width);
+	margin: 0 auto;
+}
+
+.prose h2 {
+	font-size: 1rem;
+	margin: 2rem 0 0.5rem;
+}
+
+.prose p,
+.prose ul {
+	margin: 0 0 0.75rem;
+}
+
+.prose ul {
+	padding-left: 1.25rem;
+}
+
+.prose li {
+	margin-bottom: 0.25rem;
+}
+
+.prose a {
+	color: var(--accent);
 }
 
 h1 {
@@ -304,12 +386,19 @@ button.primary {
 
 /* --- フレンド --- */
 
-.friends section {
+.friends section,
+.feed-page > section {
 	margin-bottom: 2rem;
 }
 
-.friends h2 {
+.friends h2,
+.feed-page > section h2 {
 	font-size: 1rem;
+	margin: 0 0 0.6rem;
+}
+
+/* 節の説明文は入力欄との間を詰める。 */
+.feed-page > section > .muted {
 	margin: 0 0 0.6rem;
 }
 
