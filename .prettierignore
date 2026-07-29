@@ -5,6 +5,11 @@ dist/
 node_modules/
 bun.lock
 
+# playwright の実行結果。レポートも痕跡も生成物。
+test-results/
+playwright-report/
+blob-report/
+
 # terraform の管理下。state は生成物で、整形すると差分が暴れる。
 infra/.terraform/
 infra/*.tfstate
