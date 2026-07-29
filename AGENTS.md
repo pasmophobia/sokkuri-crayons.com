@@ -44,7 +44,7 @@ produces the script and managing it from both sides would drift.
 
 ## Checks
 
-Four checks gate every pull request. `main` is protected, so all four must be
+Five checks gate every pull request. `main` is protected, so all five must be
 green before a PR can merge.
 
 ```
@@ -52,6 +52,7 @@ bun run lint           # ESLint. `bun run lint:fix` to autofix.
 bun run typecheck      # astro check — .astro, .ts, and .tsx together.
 bun run format:check   # Prettier. `bun run format` to rewrite.
 bun run test           # Vitest, once. `bun run test:watch` to iterate.
+bun run test:e2e       # Playwright. `bun run test:e2e:ui` to iterate.
 ```
 
 ESLint never touches formatting — `eslint-config-prettier` turns those rules off
@@ -89,6 +90,40 @@ Two things to know before adding tests:
 
 Astro's `getViteConfig()` is unusable here: `@cloudflare/vite-plugin` rejects the
 `resolve.external` that Vitest sets on the SSR environment.
+
+### E2E
+
+`bun run test:e2e` drives a real browser (Chromium) against a real build. The
+`webServer` in `playwright.config.ts` runs `db:migrate`, `astro build` and
+`astro preview`, so what the tests click is the bundle that ships, served by
+workerd — with D1, R2, KV, the Durable Object and mail all backed by Miniflare's
+local implementations. No Cloudflare account or API token is involved.
+
+`astro dev` is deliberately not used. Vite re-optimizing dependencies mid-session
+splits the React instance (see Development above); a built artifact cannot drift
+that way. Locally the run reuses whatever already listens on 4321, so keeping
+`astro preview` open in another terminal makes the suite start instantly. CI
+always starts its own.
+
+Three things the specs lean on:
+
+- Accounts are created per test and never cleaned up. There is no way to roll
+  the local D1 back without knocking over whatever runs beside it, so every
+  name, username and address carries a random tag instead.
+- Each page announces its own `cf-connecting-ip`. better-auth rate-limits
+  sign-up to 5 per minute and that header is what keys the bucket, which a
+  parallel suite would otherwise trip immediately. Cloudflare overwrites the
+  header in production, so the spoof does not travel.
+- Wait for `hydrated(page)` before touching a React island. The markup is
+  server-rendered, so a button is on screen long before it does anything, and an
+  early click on a form submits it the plain way and navigates off the page.
+  Astro drops the `ssr` attribute from `<astro-island>` once hydrated — that is
+  the signal. The timeline is the exception: its thumbnails are `client:visible`
+  and stay unhydrated until scrolled to, so narrow the wait with `within`.
+
+Confirmation links are read out of `.wrangler/tmp/email/` (see Mail below).
+`e2e/mail.ts` decodes the token in the link to find out who a message was for,
+so simultaneous sign-ups cannot be mixed up.
 
 ## Rendering
 
@@ -128,7 +163,9 @@ Both forms are declared in `src/env.d.ts`.
 ## Auth
 
 Email + password via better-auth, stored in D1 with KV as secondary storage.
-Email verification is off — there is no mail transport yet.
+Sign-up sends a confirmation mail and the address has to be confirmed before the
+first sign-in. Confirming signs the account in on the spot, so nobody is sent
+back to the login form. Where that mail goes is under Mail below.
 
 `src/auth/index.ts` holds the runtime config. `auth.config.ts` at the repo root
 exists only for `@better-auth/cli`, which cannot see Cloudflare bindings; it

@@ -18,7 +18,16 @@ import tseslint from "typescript-eslint";
 // typescript-eslint 8 で前者は非推奨になった。
 export default defineConfig(
 	{
-		ignores: ["dist/", ".astro/", ".wrangler/", "worker-configuration.d.ts", "auth.schema.sql"],
+		ignores: [
+			"dist/",
+			".astro/",
+			".wrangler/",
+			"test-results/",
+			"playwright-report/",
+			"blob-report/",
+			"worker-configuration.d.ts",
+			"auth.schema.sql",
+		],
 	},
 
 	js.configs.recommended,
