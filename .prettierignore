@@ -5,6 +5,11 @@ dist/
 node_modules/
 bun.lock
 
+# terraform の管理下。state は生成物で、整形すると差分が暴れる。
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+
 # better-auth の生成物。手で整えると生成器の出力と差分が出る。
 auth.schema.sql
 worker-configuration.d.ts

@@ -58,5 +58,17 @@ export default defineConfig(
 		},
 	},
 
+	// infra/ の補助スクリプトも Node の CLI。
+	// 何を書き換えたかを伝えるのが仕事なので、標準出力への出力は通す。
+	{
+		files: ["infra/**/*.mjs"],
+		languageOptions: {
+			globals: globals.node,
+		},
+		rules: {
+			"no-console": "off",
+		},
+	},
+
 	prettier,
 );

@@ -3,29 +3,75 @@
 	"compatibility_date": "2026-07-29",
 	// Agents SDK が node:async_hooks / node:diagnostics_channel を使う。
 	"compatibility_flags": ["global_fetch_strictly_public", "nodejs_compat"],
-	"name": "artc",
+	"name": "sokkuri-crayons",
+	// デプロイ先。複数アカウントに所属していると、これが無い場合に
+	// wrangler が非対話モードで選べず止まる。
+	"account_id": "d6f708ff17dcc5efdf24f852c65c4a6c",
 	"main": "./src/worker.ts",
+	// 独自ドメインで配信する。custom_domain を付けると wrangler が DNS レコードと
+	// 証明書まで面倒を見る（この分だけは Terraform ではなく wrangler の管轄）。
+	// ゾーンが同じアカウントに無いとデプロイが失敗する。
+	"routes": [
+		{
+			"pattern": "sokkuri-crayons.com",
+			"custom_domain": true,
+		},
+	],
+	// 独自ドメインに寄せるので workers.dev の URL は生やさない。
+	// 同じアプリが 2 つの入口から見える状態を避ける。
+	"workers_dev": false,
 	"assets": {
 		"directory": "./dist",
 		"binding": "ASSETS",
 	},
 	// better-auth のユーザー・セッション・アカウントを格納する。
-	// `wrangler d1 create artc-auth` で作った ID に差し替えること。
+	// 実体は Terraform が作る。ID は `bun run infra:sync` が書き込む。
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "artc-auth",
+			"database_name": "sokkuri-crayons-auth",
 			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "./migrations",
 		},
 	],
 	// better-auth の secondary storage（セッションキャッシュ・レート制限・検証トークン）。
-	// `wrangler kv namespace create AUTH_KV` で作った ID に差し替えること。
-	"kv_namespaces": [{ "binding": "AUTH_KV", "id": "0000000000000000000000000000000000" }],
-	// 元画像と、op を焼き込んだサムネイル。
-	// `wrangler r2 bucket create artc-media` で作っておくこと。
-	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "artc-media" }],
+	// 実体は Terraform が作る。ID は `bun run infra:sync` が書き込む。
+	"kv_namespaces": [
+		{
+			"binding": "AUTH_KV",
+			"id": "0000000000000000000000000000000000",
+		},
+	],
+	// 元画像とアイコン。実体は Terraform が作る。
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "sokkuri-crayons-media",
+		},
+	],
+	// 確認メール・パスワード再設定の送信 (Cloudflare Email Service)。
+	//
+	// `remote: true` は付けない。付けると vite が起動時に実アカウントへ接続しに行き、
+	// 資格情報が無い／アカウントが複数ある環境では dev サーバごと起動しなくなる。
+	// ローカルでは送信されず、リンクは端末のログに出る（src/lib/mailer.ts）。
+	// 実際に送るには Workers Paid と、Cloudflare DNS 上のドメインを
+	// Email Service に登録することが要る。
+	"send_email": [
+		{
+			"name": "EMAIL",
+		},
+	],
+	// 差出人。Email Service に登録したドメインのアドレスであること。
+	"vars": {
+		"MAIL_FROM": "no-reply@sokkuri-crayons.com",
+	},
 	"durable_objects": {
-		"bindings": [{ "name": "Post", "class_name": "Post" }],
+		"bindings": [
+			{
+				"name": "Post",
+				"class_name": "Post",
+			},
+		],
 	},
 	"migrations": [
 		{
