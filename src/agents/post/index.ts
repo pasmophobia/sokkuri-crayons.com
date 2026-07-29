@@ -281,10 +281,7 @@ export class Post extends Agent<Env, PostState> {
 
 				op.payload.points.push(...message.points);
 				op.updatedAt = Date.now();
-				this.#broadcast(
-					{ type: "op:extended", id: op.id, points: message.points },
-					connection.id,
-				);
+				this.#broadcast({ type: "op:extended", id: op.id, points: message.points }, connection.id);
 				this.#markDirty();
 				return;
 			}
@@ -408,10 +405,7 @@ export class Post extends Agent<Env, PostState> {
 	}
 
 	/** 自分が始めた進行中の op を引く。無ければクライアントにエラーを返して null。 */
-	#requireOwnPending(
-		connection: Connection<ConnectionState>,
-		id: string,
-	): SubmittedOp | null {
+	#requireOwnPending(connection: Connection<ConnectionState>, id: string): SubmittedOp | null {
 		const op = this.#pending.get(id);
 		if (!op) {
 			this.#send(connection, { type: "error", message: "no such pending op", ref: id });

@@ -13,49 +13,49 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 
 <Base title="タイムライン">
 	<div class="feed-page">
-	<h1>タイムライン</h1>
+		<h1>タイムライン</h1>
 
-	{
-		posts.length === 0 ? (
-			<p class="empty">
-				まだ投稿がありません。
-				{user ? (
-					<a href="/posts/new">最初の 1 枚を投稿</a>
-				) : (
-					<a href="/signup">登録すると投稿できます</a>
-				)}
-			</p>
-		) : (
-			<ul class="feed">
-				{posts.map((post) => (
-					<li class="card">
-						<a href={`/posts/${post.id}`}>
-							{/* 落書きは見る側のブラウザがその場で描く。画面に入った分だけ。 */}
-							<FeedThumbnail
-								client:visible
-								postId={post.id}
-								imageUrl={mediaUrl(post.imageKey)}
-								aspectRatio={post.aspectRatio}
-								caption={post.caption}
-							/>
-							<div class="meta">
-								<div class="byline">
-									{post.authorImage ? (
-										<img class="avatar" src={mediaUrl(post.authorImage)} alt="" />
-									) : (
-										<span class="avatar avatar-blank">{post.authorName.slice(0, 1)}</span>
-									)}
-									<span>{post.authorName}</span>
-									<span class="muted">{formatter.format(post.createdAt)}</span>
-									{post.visibility === "friends" && <span class="badge">フレンドのみ</span>}
+		{
+			posts.length === 0 ? (
+				<p class="empty">
+					まだ投稿がありません。
+					{user ? (
+						<a href="/posts/new">最初の 1 枚を投稿</a>
+					) : (
+						<a href="/signup">登録すると投稿できます</a>
+					)}
+				</p>
+			) : (
+				<ul class="feed">
+					{posts.map((post) => (
+						<li class="card">
+							<a href={`/posts/${post.id}`}>
+								{/* 落書きは見る側のブラウザがその場で描く。画面に入った分だけ。 */}
+								<FeedThumbnail
+									client:visible
+									postId={post.id}
+									imageUrl={mediaUrl(post.imageKey)}
+									aspectRatio={post.aspectRatio}
+									caption={post.caption}
+								/>
+								<div class="meta">
+									<div class="byline">
+										{post.authorImage ? (
+											<img class="avatar" src={mediaUrl(post.authorImage)} alt="" />
+										) : (
+											<span class="avatar avatar-blank">{post.authorName.slice(0, 1)}</span>
+										)}
+										<span>{post.authorName}</span>
+										<span class="muted">{formatter.format(post.createdAt)}</span>
+										{post.visibility === "friends" && <span class="badge">フレンドのみ</span>}
+									</div>
+									<div class="caption">{post.caption || "（キャプションなし）"}</div>
 								</div>
-								<div class="caption">{post.caption || "（キャプションなし）"}</div>
-							</div>
-						</a>
-					</li>
-				))}
-			</ul>
-		)
-	}
+							</a>
+						</li>
+					))}
+				</ul>
+			)
+		}
 	</div>
 </Base>

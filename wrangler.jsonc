@@ -7,7 +7,7 @@
 	"main": "./src/worker.ts",
 	"assets": {
 		"directory": "./dist",
-		"binding": "ASSETS"
+		"binding": "ASSETS",
 	},
 	// better-auth のユーザー・セッション・アカウントを格納する。
 	// `wrangler d1 create artc-auth` で作った ID に差し替えること。
@@ -15,8 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "artc-auth",
-			"database_id": "00000000-0000-0000-0000-000000000000"
-		}
+			"database_id": "00000000-0000-0000-0000-000000000000",
+		},
 	],
 	// better-auth の secondary storage（セッションキャッシュ・レート制限・検証トークン）。
 	// `wrangler kv namespace create AUTH_KV` で作った ID に差し替えること。
@@ -25,16 +25,16 @@
 	// `wrangler r2 bucket create artc-media` で作っておくこと。
 	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "artc-media" }],
 	"durable_objects": {
-		"bindings": [{ "name": "Post", "class_name": "Post" }]
+		"bindings": [{ "name": "Post", "class_name": "Post" }],
 	},
 	"migrations": [
 		{
 			"tag": "v1",
 			// Agents SDK は SQLite バックエンドの Durable Object を前提にしている。
-			"new_sqlite_classes": ["Post"]
-		}
+			"new_sqlite_classes": ["Post"],
+		},
 	],
 	"observability": {
-		"enabled": true
-	}
+		"enabled": true,
+	},
 }

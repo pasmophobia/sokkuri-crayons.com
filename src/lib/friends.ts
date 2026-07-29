@@ -91,9 +91,7 @@ export async function listOutgoingRequests(
 	return results;
 }
 
-export type RequestOutcome =
-	| { ok: true; status: FriendshipStatus }
-	| { ok: false; reason: string };
+export type RequestOutcome = { ok: true; status: FriendshipStatus } | { ok: false; reason: string };
 
 /**
  * 入力されたユーザー名を、保存されている形に合わせる。

@@ -1,0 +1,10 @@
+# build output / generated
+dist/
+.astro/
+.wrangler/
+node_modules/
+bun.lock
+
+# better-auth の生成物。手で整えると生成器の出力と差分が出る。
+auth.schema.sql
+worker-configuration.d.ts

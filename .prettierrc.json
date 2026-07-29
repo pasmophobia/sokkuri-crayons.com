@@ -1,0 +1,16 @@
+{
+	"useTabs": true,
+	"printWidth": 100,
+	"plugins": ["prettier-plugin-astro"],
+	"overrides": [
+		{
+			"files": ["*.astro"],
+			"options": { "parser": "astro" }
+		},
+		{
+			"comment": "YAML はタブを使えない。Markdown もタブだと見た目が崩れやすい。",
+			"files": ["*.md", "*.yml", "*.yaml"],
+			"options": { "useTabs": false, "tabWidth": 2 }
+		}
+	]
+}

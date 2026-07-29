@@ -52,13 +52,7 @@ export default function SignUpForm() {
 			</label>
 			<label>
 				パスワード（8 文字以上）
-				<input
-					type="password"
-					name="password"
-					autoComplete="new-password"
-					minLength={8}
-					required
-				/>
+				<input type="password" name="password" autoComplete="new-password" minLength={8} required />
 			</label>
 			<p className="error">{error}</p>
 			<button className="primary" type="submit" disabled={pending}>
