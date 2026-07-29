@@ -1,0 +1,92 @@
+---
+import Base from "../../layouts/Base.astro";
+
+if (!Astro.locals.user) return Astro.redirect("/signin");
+---
+
+<Base title="投稿する">
+	<h1>投稿する</h1>
+
+	<form class="form" id="form">
+		<label>
+			画像の URL（https）
+			<input type="url" name="imageUrl" placeholder="https://..." required />
+		</label>
+		<label>
+			キャプション
+			<textarea name="caption" rows="3" maxlength="280"></textarea>
+		</label>
+		<p class="error" id="error"></p>
+		<img id="preview" alt="" hidden style="max-width:100%;border-radius:10px" />
+		<button class="primary" type="submit" id="submit" disabled>投稿する</button>
+		<p class="muted">
+			いまは画像 URL を貼る形式です。アップロード（R2）は未実装。
+		</p>
+	</form>
+</Base>
+
+<script>
+	const form = document.getElementById("form") as HTMLFormElement;
+	const urlInput = form.elements.namedItem("imageUrl") as HTMLInputElement;
+	const preview = document.getElementById("preview") as HTMLImageElement;
+	const submit = document.getElementById("submit") as HTMLButtonElement;
+	const errorEl = document.getElementById("error")!;
+
+	// アスペクト比は op の正規化座標を実座標に戻すのに要るので、
+	// 投稿時に実際の画像から測っておく。
+	let aspectRatio = 0;
+
+	function loadPreview() {
+		const url = urlInput.value.trim();
+		aspectRatio = 0;
+		submit.disabled = true;
+		preview.hidden = true;
+		if (!url) return;
+
+		errorEl.textContent = "画像を読み込み中…";
+		const probe = new Image();
+		probe.crossOrigin = "anonymous";
+		probe.onload = () => {
+			aspectRatio = probe.naturalWidth / probe.naturalHeight;
+			preview.src = url;
+			preview.hidden = false;
+			submit.disabled = false;
+			errorEl.textContent = "";
+		};
+		probe.onerror = () => {
+			errorEl.textContent = "画像を読み込めませんでした。URL を確認してください。";
+		};
+		probe.src = url;
+	}
+
+	urlInput.addEventListener("change", loadPreview);
+	urlInput.addEventListener("blur", loadPreview);
+
+	form.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		if (!aspectRatio) return;
+		submit.disabled = true;
+		errorEl.textContent = "";
+
+		const data = new FormData(form);
+		const response = await fetch("/api/posts", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				imageUrl: urlInput.value.trim(),
+				aspectRatio,
+				caption: String(data.get("caption") ?? ""),
+			}),
+		});
+
+		if (!response.ok) {
+			const body = (await response.json().catch(() => null)) as { message?: string } | null;
+			errorEl.textContent = body?.message ?? "投稿できませんでした";
+			submit.disabled = false;
+			return;
+		}
+
+		const { id } = (await response.json()) as { id: string };
+		location.href = `/posts/${id}`;
+	});
+</script>

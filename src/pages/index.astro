@@ -1,17 +1,43 @@
 ---
+import { env } from "cloudflare:workers";
 
+import Base from "../layouts/Base.astro";
+import { listPosts } from "../lib/posts";
+
+const posts = await listPosts(env.DB);
+const user = Astro.locals.user;
+const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" });
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Base title="タイムライン">
+	<h1>タイムライン</h1>
+
+	{
+		posts.length === 0 ? (
+			<p class="empty">
+				まだ投稿がありません。
+				{user ? (
+					<a href="/posts/new">最初の 1 枚を投稿</a>
+				) : (
+					<a href="/signup">登録すると投稿できます</a>
+				)}
+			</p>
+		) : (
+			<ul class="feed">
+				{posts.map((post) => (
+					<li class="card">
+						<a href={`/posts/${post.id}`}>
+							<img src={post.imageUrl} alt={post.caption} loading="lazy" />
+							<div class="meta">
+								<div class="caption">{post.caption || "（キャプションなし）"}</div>
+								<div class="muted">
+									{post.authorName} · {formatter.format(post.createdAt)}
+								</div>
+							</div>
+						</a>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</Base>
