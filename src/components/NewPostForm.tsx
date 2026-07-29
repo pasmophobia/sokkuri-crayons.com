@@ -1,13 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Visibility } from "../agents/post/ops";
+import { MAX_SOURCE_BYTES, fitForUpload, loadImage } from "../lib/image";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../lib/media";
 
-/** 選択された画像と、そこから測ったアスペクト比・プレビュー URL。 */
-type Picked = { file: File; aspectRatio: number; previewUrl: string };
+/** アップロードする実体と、そこから測ったアスペクト比・プレビュー URL。 */
+type Picked = { blob: Blob; type: string; aspectRatio: number; previewUrl: string };
 
 const ACCEPT = Object.keys(ALLOWED_IMAGE_TYPES).join(",");
-const MAX_MB = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
+const MAX_MB = Math.round(MAX_SOURCE_BYTES / 1024 / 1024);
 
 export default function NewPostForm({ friendCount }: { friendCount: number }) {
 	// 既定はフレンドのみ。うっかり全世界に出るより、狭い方に倒す。
@@ -15,18 +16,31 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 	const [picked, setPicked] = useState<Picked | null>(null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
+	const [hasCamera, setHasCamera] = useState(false);
 
 	// プレビュー用の object URL。差し替えのたびに前のものを開放する。
 	// （残った分は文書の破棄時にブラウザが回収するので、effect は要らない。）
 	const previewUrlRef = useRef<string | null>(null);
 
+	useEffect(() => {
+		// capture は PC のブラウザだと黙って無視され、ただのファイル選択になる。
+		// 「カメラで撮る」と書いた口が写真フォルダを開くと戸惑うので、
+		// カメラを構える端末 —— 指で触る画面 —— でだけ出す。
+		//
+		// 対応の有無は属性からは分からない（Chromium は capture を効かせるのに
+		// IDL プロパティを生やさない）ので、入力装置で見分けている。
+		setHasCamera(window.matchMedia("(pointer: coarse)").matches);
+	}, []);
+
 	async function pick(event: React.ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0];
+		// 同じ写真を撮り直したときにも change が飛ぶようにしておく。
+		event.target.value = "";
 		setPicked(null);
 		setError("");
 		if (!file) return;
 
-		if (file.size > MAX_UPLOAD_BYTES) {
+		if (file.size > MAX_SOURCE_BYTES) {
 			setError("画像が大きすぎます");
 			return;
 		}
@@ -35,14 +49,25 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 		const previewUrl = URL.createObjectURL(file);
 		previewUrlRef.current = previewUrl;
 
+		setPending(true);
 		try {
 			// op は正規化座標なので、実座標に戻すのにアスペクト比が要る。
 			const probe = await loadImage(previewUrl);
-			setPicked({ file, previewUrl, aspectRatio: probe.naturalWidth / probe.naturalHeight });
-		} catch {
+			const { blob, type } = await fitForUpload(file, probe);
+			// 縮めてもなお収まらないもの（動く gif など）は、送る前に断る。
+			if (blob.size > MAX_UPLOAD_BYTES) throw new Error("画像が大きすぎます");
+			setPicked({
+				blob,
+				type,
+				previewUrl,
+				aspectRatio: probe.naturalWidth / probe.naturalHeight,
+			});
+		} catch (failure) {
 			URL.revokeObjectURL(previewUrl);
 			previewUrlRef.current = null;
-			setError("画像を読み込めませんでした");
+			setError(failure instanceof Error ? failure.message : "画像を読み込めませんでした");
+		} finally {
+			setPending(false);
 		}
 	}
 
@@ -58,8 +83,8 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 			// 1. 実体を R2 に上げてキーをもらう
 			const upload = await fetch("/api/uploads", {
 				method: "POST",
-				headers: { "content-type": picked.file.type },
-				body: picked.file,
+				headers: { "content-type": picked.type },
+				body: picked.blob,
 			});
 			if (!upload.ok) throw await message(upload, "アップロードできませんでした");
 			const { key } = (await upload.json()) as { key: string };
@@ -88,10 +113,29 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 
 	return (
 		<form className="form" onSubmit={submit}>
-			<label>
-				画像（{MAX_MB}MB まで）
-				<input type="file" name="image" accept={ACCEPT} onChange={pick} required />
-			</label>
+			<div className="field">
+				<span>画像</span>
+				<div className="pick-actions">
+					{hasCamera && (
+						<label className="file-button">
+							カメラで撮る
+							<input
+								type="file"
+								accept={ACCEPT}
+								capture="environment"
+								onChange={pick}
+								disabled={pending}
+								hidden
+							/>
+						</label>
+					)}
+					<label className="file-button">
+						{hasCamera ? "写真を選ぶ" : "画像を選ぶ"}
+						<input type="file" accept={ACCEPT} onChange={pick} disabled={pending} hidden />
+					</label>
+				</div>
+				<p className="muted">大きい写真は縮めて送ります（{MAX_MB}MB まで）。</p>
+			</div>
 			<label>
 				キャプション
 				<textarea name="caption" rows={3} maxLength={280} />
@@ -124,15 +168,6 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 			</p>
 		</form>
 	);
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-	return new Promise((resolve, reject) => {
-		const image = new Image();
-		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error("failed to decode"));
-		image.src = src;
-	});
 }
 
 async function message(response: Response, fallback: string): Promise<Error> {

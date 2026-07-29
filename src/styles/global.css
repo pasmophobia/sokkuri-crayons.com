@@ -178,12 +178,22 @@ h1 {
 	gap: 0.85rem;
 }
 
-.form label {
+/* .field は label で包めない項目 —— ボタンで選ぶ画像欄 —— を同じ見た目に揃える。 */
+.form label,
+.form .field {
 	display: flex;
 	flex-direction: column;
 	gap: 0.3rem;
 	font-size: 0.85rem;
 	color: var(--muted);
+}
+
+/* カメラと写真は横に並べ、幅が足りなければ折る。 */
+.pick-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-bottom: 0.1rem;
 }
 
 input,
@@ -388,6 +398,16 @@ button.primary {
 
 .file-button:hover {
 	border-color: var(--accent);
+}
+
+/* label は disabled にできないので、中の input の状態を借りる。 */
+.file-button:has(input:disabled) {
+	color: var(--muted);
+	cursor: default;
+}
+
+.file-button:has(input:disabled):hover {
+	border-color: var(--border);
 }
 
 /* --- フレンド --- */
