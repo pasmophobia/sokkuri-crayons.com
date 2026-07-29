@@ -58,6 +58,9 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      # 歪みの実装は crates/render の wasm。`bun run test` が焼くので
+      # ターゲットだけ足す（Rust 本体はランナーに入っている）。
+      - run: rustup target add wasm32-unknown-unknown
       # テストは workerd の中で走る。D1 も R2 も Miniflare のローカル実装なので、
       # Cloudflare のアカウントや API トークンは要らない。
       - run: bun run test
@@ -71,6 +74,8 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      # webServer が走らせる `bun run build` が crates/render の wasm を焼く。
+      - run: rustup target add wasm32-unknown-unknown
       # ブラウザは Chromium だけ。落書きの検証に必要なのはそこまでで、
       # 増やすと得るものより実行時間の方が伸びる。
       - run: bunx playwright install --with-deps chromium

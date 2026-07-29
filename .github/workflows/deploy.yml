@@ -28,6 +28,8 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      # テストもビルドも crates/render の wasm を焼いてから走る。
+      - run: rustup target add wasm32-unknown-unknown
 
       # 本番に出す前に、PR で通ったのと同じ検査をもう一度通す。
       # main へは直接 push もできるので、PR の緑だけには頼らない。

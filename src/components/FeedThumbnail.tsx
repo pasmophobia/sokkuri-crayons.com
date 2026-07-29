@@ -28,8 +28,17 @@ type Props = {
  */
 const THUMBNAIL_WIDTH = 960;
 
+/**
+ * 描き上がるまでの見せ方。
+ *
+ * `loading` はサーバが返す markup の初期値でもある。JS が動かない場合は
+ * ここから動かないので、`Base.astro` の `<noscript>` がぼかしを外して
+ * 元画像をそのまま見せる。焼けなかったときは `failed` に落とす。
+ */
+type Phase = "loading" | "ready" | "failed";
+
 export default function FeedThumbnail({ postId, imageUrl, aspectRatio, caption }: Props) {
-	const [drawn, setDrawn] = useState(false);
+	const [phase, setPhase] = useState<Phase>("loading");
 	const cancelled = useRef(false);
 
 	// canvas が現れた時点で描き始める。要素が要るだけなので useEffect は挟まない。
@@ -37,9 +46,10 @@ export default function FeedThumbnail({ postId, imageUrl, aspectRatio, caption }
 		(canvas: HTMLCanvasElement | null) => {
 			if (!canvas) return;
 			cancelled.current = false;
+			setPhase("loading");
 
 			void draw(canvas, postId, imageUrl, aspectRatio, cancelled).then((ok) => {
-				if (ok && !cancelled.current) setDrawn(true);
+				if (!cancelled.current) setPhase(ok ? "ready" : "failed");
 			});
 
 			return () => {
@@ -50,10 +60,14 @@ export default function FeedThumbnail({ postId, imageUrl, aspectRatio, caption }
 	);
 
 	return (
-		<div className="thumb" style={{ aspectRatio }}>
-			{/* 描き上がるまで（および JS が動かない場合）は元画像を見せる。 */}
-			<img src={imageUrl} alt={caption} loading="lazy" hidden={drawn} />
-			<canvas ref={mount} hidden={!drawn} />
+		<div className="thumb" data-phase={phase} style={{ aspectRatio }}>
+			{/*
+			 * 元画像とキャンバスを重ねる。焼き上がるまではキャンバスが透けていて、
+			 * 下のこれが見える。`crossOrigin` は draw() 側の Image と揃える。
+			 * 揃えないと同じ URL を 2 回取りに行くことになる。
+			 */}
+			<img src={imageUrl} alt={caption} loading="lazy" crossOrigin="anonymous" />
+			<canvas ref={mount} aria-hidden="true" />
 		</div>
 	);
 }

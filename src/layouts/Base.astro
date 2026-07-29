@@ -17,6 +17,22 @@ const user = Astro.locals.user;
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>{title} | そっくりクレヨン</title>
+		<noscript>
+			<!--
+				キャンバスは JS が焼く。動かないなら焼き上がりは来ないので、
+				待っている見た目（ぼかし）をやめて元画像をそのまま見せる。
+			-->
+			<style>
+				[data-phase="loading"] > img {
+					filter: none !important;
+					transform: none !important;
+					animation: none !important;
+				}
+				[data-phase="loading"] > canvas {
+					display: none;
+				}
+			</style>
+		</noscript>
 	</head>
 	<body>
 		<header class="site-header">

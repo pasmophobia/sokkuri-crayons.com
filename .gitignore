@@ -2,6 +2,9 @@
 dist/
 # generated types
 .astro/
+# rust -> wasm の生成物。`bun run wasm:build` で作る。
+crates/*/target/
+src/wasm/
 
 # dependencies
 node_modules/
