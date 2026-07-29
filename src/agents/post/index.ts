@@ -109,6 +109,17 @@ export class Post extends Agent<Env, PostState> {
 		}
 	}
 
+	/**
+	 * 投稿作成時に `POST /api/posts` から 1 度だけ呼ばれる (Durable Object RPC)。
+	 * メタ情報をクライアントに作らせないための、サーバ専用の入口。
+	 * 冪等 — 既に初期化済みなら何もしない。
+	 */
+	async initPost(meta: PostMeta): Promise<void> {
+		if (this.#post !== null) return;
+		this.#post = meta;
+		this.#markDirty();
+	}
+
 	// --- メッセージ処理 ---
 
 	#dispatch(connection: Connection<ConnectionState>, message: ClientMessage): void {
@@ -124,24 +135,6 @@ export class Post extends Agent<Env, PostState> {
 		}
 
 		switch (message.type) {
-			case "post:create": {
-				if (this.#post !== null) {
-					this.#send(connection, { type: "error", message: "post already exists" });
-					return;
-				}
-				const post: PostMeta = {
-					imageUrl: message.imageUrl,
-					aspectRatio: message.aspectRatio,
-					caption: message.caption,
-					authorId,
-					createdAt: Date.now(),
-				};
-				this.#post = post;
-				this.#broadcast({ type: "post:created", post });
-				this.#markDirty();
-				return;
-			}
-
 			case "op:begin": {
 				if (this.#pending.has(message.id) || this.#committedIds.has(message.id)) {
 					this.#send(connection, {

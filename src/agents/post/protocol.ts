@@ -37,12 +37,6 @@ export const LIMITS = {
 // --- クライアント -> サーバ ---
 
 export type ClientMessage =
-	| {
-			type: "post:create";
-			imageUrl: string;
-			aspectRatio: number;
-			caption: string;
-	  }
 	/** 新しい op を開始する。この時点から他のクライアントにも見える。 */
 	| { type: "op:begin"; id: string; payload: OpPayload }
 	/** 進行中の op に点を追加する。 */
@@ -62,7 +56,6 @@ export type ServerMessage =
 	 * 未ログインなら null（閲覧のみ）。
 	 */
 	| { type: "hello"; you: string | null; displayName: string | null; state: PostState }
-	| { type: "post:created"; post: PostMeta }
 	| { type: "op:began"; op: SubmittedOp }
 	| { type: "op:extended"; id: string; points: Point[] }
 	| { type: "op:committed"; op: CommittedOp }
@@ -201,6 +194,22 @@ function parseHttpsUrl(raw: unknown): ParseResult<string> {
 	return ok(url.toString());
 }
 
+/** 新規投稿のフォーム入力。作成は WebSocket ではなく `POST /api/posts` が受ける。 */
+export type NewPostInput = { imageUrl: string; aspectRatio: number; caption: string };
+
+export function parseNewPostInput(raw: unknown): ParseResult<NewPostInput> {
+	if (!isRecord(raw)) return fail("body must be a json object");
+	const imageUrl = parseHttpsUrl(raw.imageUrl);
+	if (!imageUrl.ok) return imageUrl;
+	const aspectRatio = num(raw.aspectRatio, 0.01, 100);
+	if (aspectRatio === null) return fail("aspectRatio must be a number within 0.01..100");
+	const caption = typeof raw.caption === "string" ? raw.caption.trim() : "";
+	if (caption.length > LIMITS.MAX_CAPTION_LENGTH) {
+		return fail(`caption must be at most ${LIMITS.MAX_CAPTION_LENGTH} characters`);
+	}
+	return ok({ imageUrl: imageUrl.value, aspectRatio, caption });
+}
+
 /** 受信した生フレームを `ClientMessage` に変換する。 */
 export function parseClientMessage(raw: string): ParseResult<ClientMessage> {
 	let json: unknown;
@@ -212,17 +221,6 @@ export function parseClientMessage(raw: string): ParseResult<ClientMessage> {
 	if (!isRecord(json)) return fail("message must be a json object");
 
 	switch (json.type) {
-		case "post:create": {
-			const imageUrl = parseHttpsUrl(json.imageUrl);
-			if (!imageUrl.ok) return imageUrl;
-			const aspectRatio = num(json.aspectRatio, 0.01, 100);
-			if (aspectRatio === null) return fail("aspectRatio must be a number within 0.01..100");
-			const caption = typeof json.caption === "string" ? json.caption.trim() : "";
-			if (caption.length > LIMITS.MAX_CAPTION_LENGTH) {
-				return fail(`caption must be at most ${LIMITS.MAX_CAPTION_LENGTH} characters`);
-			}
-			return ok({ type: "post:create", imageUrl: imageUrl.value, aspectRatio, caption });
-		}
 		case "op:begin": {
 			const id = sanitizeId(json.id, LIMITS.MAX_OP_ID_LENGTH);
 			if (id === null) return fail("op id must be a short url-safe string");
