@@ -88,9 +88,10 @@ export type CommittedOp = OpBase & {
 	undone?: boolean;
 };
 
-/** 投稿そのもののメタ情報。元画像は別途アップロード済みである前提。 */
+/** 投稿そのもののメタ情報。元画像は R2 にアップロード済みである前提。 */
 export type PostMeta = {
-	imageUrl: string;
+	/** R2 のオブジェクトキー。`/api/media/<key>` から配る。 */
+	imageKey: string;
 	/** 元画像の width / height。正規化座標を実座標に戻すのに要る。 */
 	aspectRatio: number;
 	caption: string;

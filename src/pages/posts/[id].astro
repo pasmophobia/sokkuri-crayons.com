@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 
 import Base from "../../layouts/Base.astro";
+import { mediaUrl } from "../../lib/media";
 import { getPost } from "../../lib/posts";
 
 const { id } = Astro.params;
@@ -110,7 +111,7 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 	}
 </style>
 
-<script define:vars={{ postId: post.id, imageUrl: post.imageUrl, aspectRatio: post.aspectRatio }}>
+<script define:vars={{ postId: post.id, imageUrl: mediaUrl(post.imageKey), aspectRatio: post.aspectRatio }}>
 	window.__post = { postId, imageUrl, aspectRatio };
 </script>
 
@@ -140,8 +141,7 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 	try {
 		await editor.loadImage(imageUrl, aspectRatio);
 	} catch {
-		errorEl.textContent =
-			"画像を読み込めませんでした。CORS を許可しているホストの画像である必要があります。";
+		errorEl.textContent = "画像を読み込めませんでした。";
 	}
 	editor.connect(postId);
 

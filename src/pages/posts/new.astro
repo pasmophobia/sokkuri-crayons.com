@@ -1,7 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../../lib/media";
 
 if (!Astro.locals.user) return Astro.redirect("/signin");
+
+const accept = Object.keys(ALLOWED_IMAGE_TYPES).join(",");
+const maxMb = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
 ---
 
 <Base title="投稿する">
@@ -9,8 +13,8 @@ if (!Astro.locals.user) return Astro.redirect("/signin");
 
 	<form class="form" id="form">
 		<label>
-			画像の URL（https）
-			<input type="url" name="imageUrl" placeholder="https://..." required />
+			画像（{maxMb}MB まで）
+			<input type="file" name="image" accept={accept} required />
 		</label>
 		<label>
 			キャプション
@@ -19,74 +23,87 @@ if (!Astro.locals.user) return Astro.redirect("/signin");
 		<p class="error" id="error"></p>
 		<img id="preview" alt="" hidden style="max-width:100%;border-radius:10px" />
 		<button class="primary" type="submit" id="submit" disabled>投稿する</button>
-		<p class="muted">
-			いまは画像 URL を貼る形式です。アップロード（R2）は未実装。
-		</p>
+		<p class="muted">投稿すると、誰でもこの画像に落書きや歪みを加えられます。</p>
 	</form>
 </Base>
 
 <script>
+	import { MAX_UPLOAD_BYTES } from "../../lib/media";
+
 	const form = document.getElementById("form") as HTMLFormElement;
-	const urlInput = form.elements.namedItem("imageUrl") as HTMLInputElement;
+	const fileInput = form.elements.namedItem("image") as HTMLInputElement;
 	const preview = document.getElementById("preview") as HTMLImageElement;
 	const submit = document.getElementById("submit") as HTMLButtonElement;
 	const errorEl = document.getElementById("error")!;
 
-	// アスペクト比は op の正規化座標を実座標に戻すのに要るので、
-	// 投稿時に実際の画像から測っておく。
+	let file: File | null = null;
+	// op は正規化座標なので、実座標に戻すのにアスペクト比が要る。
 	let aspectRatio = 0;
 
-	function loadPreview() {
-		const url = urlInput.value.trim();
+	fileInput.addEventListener("change", () => {
+		file = fileInput.files?.[0] ?? null;
 		aspectRatio = 0;
 		submit.disabled = true;
 		preview.hidden = true;
-		if (!url) return;
+		errorEl.textContent = "";
+		if (!file) return;
 
-		errorEl.textContent = "画像を読み込み中…";
+		if (file.size > MAX_UPLOAD_BYTES) {
+			errorEl.textContent = "画像が大きすぎます";
+			return;
+		}
+
+		const objectUrl = URL.createObjectURL(file);
 		const probe = new Image();
-		probe.crossOrigin = "anonymous";
 		probe.onload = () => {
 			aspectRatio = probe.naturalWidth / probe.naturalHeight;
-			preview.src = url;
+			preview.src = objectUrl;
 			preview.hidden = false;
 			submit.disabled = false;
-			errorEl.textContent = "";
 		};
 		probe.onerror = () => {
-			errorEl.textContent = "画像を読み込めませんでした。URL を確認してください。";
+			URL.revokeObjectURL(objectUrl);
+			errorEl.textContent = "画像を読み込めませんでした";
 		};
-		probe.src = url;
-	}
-
-	urlInput.addEventListener("change", loadPreview);
-	urlInput.addEventListener("blur", loadPreview);
+		probe.src = objectUrl;
+	});
 
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
-		if (!aspectRatio) return;
+		if (!file || !aspectRatio) return;
 		submit.disabled = true;
-		errorEl.textContent = "";
+		errorEl.textContent = "アップロード中…";
 
+		const fail = async (response: Response, fallback: string) => {
+			const body = (await response.json().catch(() => null)) as { message?: string } | null;
+			errorEl.textContent = body?.message ?? fallback;
+			submit.disabled = false;
+		};
+
+		// 1. 実体を R2 に上げてキーをもらう
+		const upload = await fetch("/api/uploads", {
+			method: "POST",
+			headers: { "content-type": file.type },
+			body: file,
+		});
+		if (!upload.ok) return fail(upload, "アップロードできませんでした");
+		const { key } = (await upload.json()) as { key: string };
+
+		// 2. そのキーで投稿レコードを作る
+		errorEl.textContent = "投稿中…";
 		const data = new FormData(form);
-		const response = await fetch("/api/posts", {
+		const created = await fetch("/api/posts", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify({
-				imageUrl: urlInput.value.trim(),
+				imageKey: key,
 				aspectRatio,
 				caption: String(data.get("caption") ?? ""),
 			}),
 		});
+		if (!created.ok) return fail(created, "投稿できませんでした");
 
-		if (!response.ok) {
-			const body = (await response.json().catch(() => null)) as { message?: string } | null;
-			errorEl.textContent = body?.message ?? "投稿できませんでした";
-			submit.disabled = false;
-			return;
-		}
-
-		const { id } = (await response.json()) as { id: string };
+		const { id } = (await created.json()) as { id: string };
 		location.href = `/posts/${id}`;
 	});
 </script>

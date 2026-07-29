@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 
 import Base from "../layouts/Base.astro";
+import { mediaUrl, thumbnailKey } from "../lib/media";
 import { listPosts } from "../lib/posts";
 
 const posts = await listPosts(env.DB);
@@ -27,7 +28,16 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 				{posts.map((post) => (
 					<li class="card">
 						<a href={`/posts/${post.id}`}>
-							<img src={post.imageUrl} alt={post.caption} loading="lazy" />
+							{/* 落書きを焼き込んだサムネイル。まだ焼かれていなければ元画像。 */}
+							<img
+								src={
+									post.thumbnailUpdatedAt
+										? mediaUrl(thumbnailKey(post.id), post.thumbnailUpdatedAt)
+										: mediaUrl(post.imageKey)
+								}
+								alt={post.caption}
+								loading="lazy"
+							/>
 							<div class="meta">
 								<div class="caption">{post.caption || "（キャプションなし）"}</div>
 								<div class="muted">

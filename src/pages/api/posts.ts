@@ -33,10 +33,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
 	const id = crypto.randomUUID();
 	const createdAt = Date.now();
 
+	// アップロード済みの実体を指しているか確かめる。
+	if (!(await env.MEDIA.head(parsed.value.imageKey))) {
+		return Response.json({ message: "imageKey has not been uploaded" }, { status: 400 });
+	}
+
 	await insertPost(env.DB, {
 		id,
 		authorId: user.id,
-		imageUrl: parsed.value.imageUrl,
+		imageKey: parsed.value.imageKey,
 		aspectRatio: parsed.value.aspectRatio,
 		caption: parsed.value.caption,
 	});
@@ -45,7 +50,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 	// 生きているので、詳細ページを開いた時点で改めて初期化される。
 	const agent = await getAgentByName<Env, Post>(env.Post, id);
 	await agent.initPost({
-		imageUrl: parsed.value.imageUrl,
+		imageKey: parsed.value.imageKey,
 		aspectRatio: parsed.value.aspectRatio,
 		caption: parsed.value.caption,
 		authorId: user.id,

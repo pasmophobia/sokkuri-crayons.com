@@ -6,6 +6,7 @@
  * 1 ストロークにつき何十回も飛ぶホットパスだから。
  */
 
+import { isOriginalKey } from "../../lib/media";
 import type {
 	BlendMode,
 	DisplaceMode,
@@ -29,7 +30,6 @@ export const LIMITS = {
 	MAX_OP_ID_LENGTH: 64,
 	MAX_TEXT_LENGTH: 140,
 	MAX_CAPTION_LENGTH: 280,
-	MAX_IMAGE_URL_LENGTH: 2048,
 	/** 未確定のまま放置された op を掃除するまでの時間。 */
 	PENDING_OP_TTL_MS: 5 * 60 * 1000,
 } as const;
@@ -180,34 +180,21 @@ function parsePayload(raw: unknown): ParseResult<OpPayload> {
 	}
 }
 
-function parseHttpsUrl(raw: unknown): ParseResult<string> {
-	if (typeof raw !== "string" || raw.length > LIMITS.MAX_IMAGE_URL_LENGTH) {
-		return fail("imageUrl must be a string url");
-	}
-	let url: URL;
-	try {
-		url = new URL(raw);
-	} catch {
-		return fail("imageUrl must be a valid url");
-	}
-	if (url.protocol !== "https:") return fail("imageUrl must use https");
-	return ok(url.toString());
-}
-
 /** 新規投稿のフォーム入力。作成は WebSocket ではなく `POST /api/posts` が受ける。 */
-export type NewPostInput = { imageUrl: string; aspectRatio: number; caption: string };
+export type NewPostInput = { imageKey: string; aspectRatio: number; caption: string };
 
 export function parseNewPostInput(raw: unknown): ParseResult<NewPostInput> {
 	if (!isRecord(raw)) return fail("body must be a json object");
-	const imageUrl = parseHttpsUrl(raw.imageUrl);
-	if (!imageUrl.ok) return imageUrl;
+	if (typeof raw.imageKey !== "string" || !isOriginalKey(raw.imageKey)) {
+		return fail("imageKey must be an uploaded original key");
+	}
 	const aspectRatio = num(raw.aspectRatio, 0.01, 100);
 	if (aspectRatio === null) return fail("aspectRatio must be a number within 0.01..100");
 	const caption = typeof raw.caption === "string" ? raw.caption.trim() : "";
 	if (caption.length > LIMITS.MAX_CAPTION_LENGTH) {
 		return fail(`caption must be at most ${LIMITS.MAX_CAPTION_LENGTH} characters`);
 	}
-	return ok({ imageUrl: imageUrl.value, aspectRatio, caption });
+	return ok({ imageKey: raw.imageKey, aspectRatio, caption });
 }
 
 /** 受信した生フレームを `ClientMessage` に変換する。 */

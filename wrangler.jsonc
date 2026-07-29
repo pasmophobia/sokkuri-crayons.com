@@ -21,6 +21,9 @@
 	// better-auth の secondary storage（セッションキャッシュ・レート制限・検証トークン）。
 	// `wrangler kv namespace create AUTH_KV` で作った ID に差し替えること。
 	"kv_namespaces": [{ "binding": "AUTH_KV", "id": "0000000000000000000000000000000000" }],
+	// 元画像と、op を焼き込んだサムネイル。
+	// `wrangler r2 bucket create artc-media` で作っておくこと。
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "artc-media" }],
 	"durable_objects": {
 		"bindings": [{ "name": "Post", "class_name": "Post" }]
 	},
