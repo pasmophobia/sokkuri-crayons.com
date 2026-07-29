@@ -7,12 +7,19 @@
  *   pendingOps   … いま描いている最中。全員にライブ配信される。
  *   committedOps … 確定した履歴。`seq` の順が描画順。
  *
- * 状態の書き戻し (`setState`) は状態まるごとのブロードキャストを伴うので、
- * 点が 1 つ増えるたびに呼ぶと帯域が持たない。そこで
- *   - 低レイテンシのライブ表示は `op:*` の差分ブロードキャストで担い、
- *   - `setState` は #markDirty() で FLUSH_INTERVAL_MS ごとに束ねる
- * という二本立てにしている。差分が落ちても、次の flush で届く state が
- * 常に正になる。
+ * 保存の仕方をこの 2 つで分けている。
+ *
+ * 確定した op は `this.sql` の `committed_op` テーブルへその場で書く。
+ * DO の `setTimeout` は耐久性がなく、最後の接続が閉じると保留中のタイマーは
+ * 発火しないまま退避されるので、履歴の保存を遅延させてはいけない
+ * （描いてタブを閉じる、が消える）。SQL 書き込みならブロードキャストも伴わない。
+ *
+ * 一方 `setState` は状態まるごとのブロードキャストを伴うので、点が 1 つ
+ * 増えるたびには呼べない。こちらは #markDirty() で FLUSH_INTERVAL_MS ごとに
+ * 束ね、クライアントへの再同期（取りこぼしの自己修復）専用として使う。
+ * 落ちても困らない pendingOps の保存もこれに乗せている。
+ *
+ * つまり永続化の権威は SQL、`state` はその射影。起動時の復元は SQL から行う。
  */
 
 import { Agent, type Connection, type ConnectionContext, type WSMessage } from "agents";
@@ -51,14 +58,55 @@ export class Post extends Agent<Env, PostState> {
 	#flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 	override onStart(): void {
-		// DO が起きるたびに呼ばれる。永続化された state からメモリ上の像を復元する。
-		const state = this.state;
-		this.#post = state.post;
-		this.#committed = [...state.committedOps];
+		// DO が起きるたびに呼ばれる。
+		this.sql`
+			create table if not exists committed_op (
+				id text primary key,
+				seq integer not null,
+				author_id text not null,
+				committed_at integer not null,
+				undone integer not null default 0,
+				payload text not null
+			)
+		`;
+		this.sql`create index if not exists committed_op_seq on committed_op (seq)`;
+
+		// 履歴は SQL が権威。state ではなくこちらから復元する。
+		this.#committed = this.#loadCommitted();
 		this.#committedIds = new Set(this.#committed.map((op) => op.id));
 		this.#seq = this.#committed.reduce((max, op) => Math.max(max, op.seq), 0);
+
+		const state = this.state;
+		this.#post = state.post;
+		// 描きかけは落ちても構わないもの。残っていれば拾い、いなければ捨てる。
 		this.#pending = new Map(state.pendingOps.map((op) => [op.id, op]));
 		this.#sweepPending();
+
+		// state 側の写しが SQL より古いことがあるので、起こしたついでに揃える。
+		this.setState(this.#snapshot());
+	}
+
+	#loadCommitted(): CommittedOp[] {
+		const rows = this.sql<{
+			id: string;
+			seq: number;
+			author_id: string;
+			committed_at: number;
+			undone: number;
+			payload: string;
+		}>`
+			select id, seq, author_id, committed_at, undone, payload
+			from committed_op order by seq
+		`;
+
+		return rows.map((row) => ({
+			id: row.id,
+			authorId: row.author_id,
+			seq: row.seq,
+			committedAt: row.committed_at,
+			payload: JSON.parse(row.payload) as CommittedOp["payload"],
+			...(row.undone ? { undone: true as const } : {}),
+		}));
 	}
 
 	/**
@@ -117,7 +165,8 @@ export class Post extends Agent<Env, PostState> {
 	async initPost(meta: PostMeta): Promise<void> {
 		if (this.#post !== null) return;
 		this.#post = meta;
-		this.#markDirty();
+		// 1 投稿につき 1 度きり。遅延させる理由がないので同期で書き切る。
+		this.setState(this.#snapshot());
 	}
 
 	// --- メッセージ処理 ---
@@ -225,6 +274,13 @@ export class Post extends Agent<Env, PostState> {
 				this.#pending.delete(op.id);
 				this.#committed.push(committed);
 				this.#committedIds.add(committed.id);
+				// 履歴はここで確定させる。flush を待たない。
+				this.sql`
+					insert or replace into committed_op
+						(id, seq, author_id, committed_at, undone, payload)
+					values (${committed.id}, ${committed.seq}, ${committed.authorId},
+						${committed.committedAt}, 0, ${JSON.stringify(committed.payload)})
+				`;
 				// commit は送信元にも返す。seq が確定するのはここだけなので。
 				this.#broadcast({ type: "op:committed", op: committed });
 				this.#markDirty();
@@ -260,6 +316,7 @@ export class Post extends Agent<Env, PostState> {
 				if (target.undone) return;
 
 				target.undone = true;
+				this.sql`update committed_op set undone = 1 where id = ${target.id}`;
 				this.#broadcast({ type: "op:undone", id: target.id });
 				this.#markDirty();
 				return;
