@@ -1,0 +1,2 @@
+# openssl rand -base64 32 で生成し、本番は `wrangler secret put BETTER_AUTH_SECRET` で入れる。
+BETTER_AUTH_SECRET=""

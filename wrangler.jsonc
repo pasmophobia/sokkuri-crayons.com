@@ -9,6 +9,18 @@
 		"directory": "./dist",
 		"binding": "ASSETS"
 	},
+	// better-auth のユーザー・セッション・アカウントを格納する。
+	// `wrangler d1 create artc-auth` で作った ID に差し替えること。
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "artc-auth",
+			"database_id": "00000000-0000-0000-0000-000000000000"
+		}
+	],
+	// better-auth の secondary storage（セッションキャッシュ・レート制限・検証トークン）。
+	// `wrangler kv namespace create AUTH_KV` で作った ID に差し替えること。
+	"kv_namespaces": [{ "binding": "AUTH_KV", "id": "0000000000000000000000000000000000" }],
 	"durable_objects": {
 		"bindings": [{ "name": "Post", "class_name": "Post" }]
 	},

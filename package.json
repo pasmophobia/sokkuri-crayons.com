@@ -12,14 +12,20 @@
 		"astro": "astro",
 		"generate-types": "wrangler types",
 		"deploy": "astro build && wrangler deploy",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"auth:generate": "better-auth generate --config auth.config.ts --output migrations/0001_better_auth.sql -y",
+		"db:migrate": "wrangler d1 migrations apply artc-auth --local",
+		"db:migrate:remote": "wrangler d1 migrations apply artc-auth --remote"
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "^14.1.6",
 		"agents": "^0.20.1",
-		"astro": "^7.1.5"
+		"astro": "^7.1.5",
+		"better-auth": "^1.6.25",
+		"better-auth-cloudflare": "^0.3.1"
 	},
 	"devDependencies": {
+		"@better-auth/cli": "^1.4.21",
 		"wrangler": "^4.115.0"
 	}
 }
