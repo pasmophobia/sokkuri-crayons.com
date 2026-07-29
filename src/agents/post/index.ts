@@ -17,12 +17,12 @@
 
 import { Agent, type Connection, type ConnectionContext, type WSMessage } from "agents";
 
+import { createAuth } from "../../auth";
 import type { CommittedOp, PostMeta, PostState, SubmittedOp } from "./ops";
 import {
 	LIMITS,
 	encode,
 	parseClientMessage,
-	sanitizeId,
 	type ClientMessage,
 	type ServerMessage,
 } from "./protocol";
@@ -33,7 +33,11 @@ export * from "./protocol";
 /** state の書き戻しを束ねる間隔。 */
 const FLUSH_INTERVAL_MS = 200;
 
-type ConnectionState = { userId: string };
+/**
+ * 接続ごとの身元。`userId` が null なら未ログインの閲覧者で、
+ * 見るだけはできるが編集はできない。
+ */
+type ConnectionState = { userId: string | null; displayName: string | null };
 
 export class Post extends Agent<Env, PostState> {
 	initialState: PostState = { post: null, committedOps: [], pendingOps: [] };
@@ -57,16 +61,32 @@ export class Post extends Agent<Env, PostState> {
 		this.#sweepPending();
 	}
 
-	override onConnect(connection: Connection<ConnectionState>, ctx: ConnectionContext): void {
-		// TODO: 本来はセッションから引く。いまは自己申告 + 接続 ID のフォールバック。
-		const claimed = new URL(ctx.request.url).searchParams.get("userId");
-		const userId =
-			sanitizeId(claimed, LIMITS.MAX_AUTHOR_ID_LENGTH) ?? `anon-${connection.id.slice(0, 8)}`;
-		connection.setState({ userId });
+	/**
+	 * クライアントからの state 直書き (`cf_agent_state`) を全面的に禁じる。
+	 * 状態はサーバが唯一の権威で、変更は `op:*` メッセージ経由のみ。
+	 * これを開けておくと、誰でも committedOps ごと差し替えられてしまう。
+	 */
+	override shouldConnectionBeReadonly(): boolean {
+		return true;
+	}
+
+	override async onConnect(
+		connection: Connection<ConnectionState>,
+		ctx: ConnectionContext,
+	): Promise<void> {
+		// 同一オリジンの WebSocket ハンドシェイクにはブラウザが Cookie を載せるので、
+		// better-auth のセッションをそのまま引ける。
+		const identity = await this.#identify(ctx);
+		connection.setState(identity);
 
 		// 前の接続が残していった編集中の op を掃除してから、現状を渡す。
 		this.#sweepPending();
-		this.#send(connection, { type: "hello", you: userId, state: this.#snapshot() });
+		this.#send(connection, {
+			type: "hello",
+			you: identity.userId,
+			displayName: identity.displayName,
+			state: this.#snapshot(),
+		});
 	}
 
 	override onMessage(connection: Connection<ConnectionState>, message: WSMessage): void {
@@ -92,7 +112,16 @@ export class Post extends Agent<Env, PostState> {
 	// --- メッセージ処理 ---
 
 	#dispatch(connection: Connection<ConnectionState>, message: ClientMessage): void {
-		const authorId = this.#authorOf(connection);
+		// 編集はすべてログイン必須。未ログインは閲覧のみ。
+		const authorId = connection.state?.userId ?? null;
+		if (authorId === null) {
+			this.#send(connection, {
+				type: "error",
+				message: "sign in to edit this post",
+				ref: "id" in message ? message.id : undefined,
+			});
+			return;
+		}
 
 		switch (message.type) {
 			case "post:create": {
@@ -246,8 +275,24 @@ export class Post extends Agent<Env, PostState> {
 
 	// --- ヘルパ ---
 
-	#authorOf(connection: Connection<ConnectionState>): string {
-		return connection.state?.userId ?? `anon-${connection.id.slice(0, 8)}`;
+	/**
+	 * WebSocket のアップグレード要求に載っている Cookie から better-auth の
+	 * セッションを引く。セッションが無い / 引けない場合は閲覧者として扱う。
+	 */
+	async #identify(ctx: ConnectionContext): Promise<ConnectionState> {
+		try {
+			const auth = createAuth({
+				env: this.env,
+				baseURL: new URL(ctx.request.url).origin,
+			});
+			const session = await auth.api.getSession({ headers: ctx.request.headers });
+			if (!session) return { userId: null, displayName: null };
+			return { userId: session.user.id, displayName: session.user.name ?? null };
+		} catch (error) {
+			// 認証基盤が落ちているときに編集を通すわけにはいかないので、閲覧者に倒す。
+			console.error("failed to resolve session for post connection", error);
+			return { userId: null, displayName: null };
+		}
 	}
 
 	/** 自分が始めた進行中の op を引く。無ければクライアントにエラーを返して null。 */

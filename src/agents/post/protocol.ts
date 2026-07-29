@@ -27,7 +27,6 @@ export const LIMITS = {
 	/** 1 投稿が持てる確定済み op の数。超えたら新規 commit を断る。 */
 	MAX_COMMITTED_OPS: 2000,
 	MAX_OP_ID_LENGTH: 64,
-	MAX_AUTHOR_ID_LENGTH: 64,
 	MAX_TEXT_LENGTH: 140,
 	MAX_CAPTION_LENGTH: 280,
 	MAX_IMAGE_URL_LENGTH: 2048,
@@ -58,8 +57,11 @@ export type ClientMessage =
 // --- サーバ -> クライアント ---
 
 export type ServerMessage =
-	/** 接続直後に 1 度だけ。サーバが割り当てた自分の ID を伝える。 */
-	| { type: "hello"; you: string; state: PostState }
+	/**
+	 * 接続直後に 1 度だけ。`you` はセッションから引いた自分のユーザー ID で、
+	 * 未ログインなら null（閲覧のみ）。
+	 */
+	| { type: "hello"; you: string | null; displayName: string | null; state: PostState }
 	| { type: "post:created"; post: PostMeta }
 	| { type: "op:began"; op: SubmittedOp }
 	| { type: "op:extended"; id: string; points: Point[] }
