@@ -1,4 +1,5 @@
 ---
+import SignOutButton from "../components/SignOutButton";
 import "../styles/global.css";
 
 interface Props {
@@ -25,9 +26,7 @@ const user = Astro.locals.user;
 						<>
 							<a href="/posts/new">投稿する</a>
 							<span class="muted">{user.name}</span>
-							<button id="signout" type="button">
-								ログアウト
-							</button>
+							<SignOutButton client:load />
 						</>
 					) : (
 						<>
@@ -41,14 +40,5 @@ const user = Astro.locals.user;
 		<main>
 			<slot />
 		</main>
-
-		<script>
-			import { authClient } from "../lib/auth-client";
-
-			document.getElementById("signout")?.addEventListener("click", async () => {
-				await authClient.signOut();
-				location.href = "/";
-			});
-		</script>
 	</body>
 </html>

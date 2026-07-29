@@ -1,4 +1,5 @@
 ---
+import SignUpForm from "../components/SignUpForm";
 import Base from "../layouts/Base.astro";
 
 if (Astro.locals.user) return Astro.redirect("/");
@@ -6,59 +7,5 @@ if (Astro.locals.user) return Astro.redirect("/");
 
 <Base title="登録">
 	<h1>アカウント登録</h1>
-
-	<form class="form" id="form">
-		<label>
-			表示名
-			<input type="text" name="name" autocomplete="nickname" maxlength="40" required />
-		</label>
-		<label>
-			メールアドレス
-			<input type="email" name="email" autocomplete="email" required />
-		</label>
-		<label>
-			パスワード（8 文字以上）
-			<input
-				type="password"
-				name="password"
-				autocomplete="new-password"
-				minlength="8"
-				required
-			/>
-		</label>
-		<p class="error" id="error"></p>
-		<button class="primary" type="submit">登録する</button>
-		<p class="muted">
-			登録済みの場合は <a href="/signin">ログイン</a>。
-		</p>
-	</form>
+	<SignUpForm client:load />
 </Base>
-
-<script>
-	import { authClient } from "../lib/auth-client";
-
-	const form = document.getElementById("form") as HTMLFormElement;
-	const errorEl = document.getElementById("error")!;
-
-	form.addEventListener("submit", async (event) => {
-		event.preventDefault();
-		const button = form.querySelector("button")!;
-		button.disabled = true;
-		errorEl.textContent = "";
-
-		const data = new FormData(form);
-		const { error } = await authClient.signUp.email({
-			name: String(data.get("name")),
-			email: String(data.get("email")),
-			password: String(data.get("password")),
-		});
-
-		if (error) {
-			errorEl.textContent = error.message ?? "登録できませんでした";
-			button.disabled = false;
-			return;
-		}
-		// autoSignIn が有効なので、登録がそのままログインになる。
-		location.href = "/";
-	});
-</script>

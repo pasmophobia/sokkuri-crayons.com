@@ -1,6 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 
+import PostCanvas from "../../components/PostCanvas";
 import Base from "../../layouts/Base.astro";
 import { mediaUrl } from "../../lib/media";
 import { getPost } from "../../lib/posts";
@@ -15,180 +16,14 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 
 <Base title={post.caption || "投稿"}>
 	<h1>{post.caption || "（キャプションなし）"}</h1>
-	<p class="muted">
-		{post.authorName} · {formatter.format(post.createdAt)} ·
-		<span id="status">接続中…</span>
-	</p>
+	<p class="muted">{post.authorName} · {formatter.format(post.createdAt)}</p>
 
-	<div class="stage card">
-		<canvas id="canvas"></canvas>
-	</div>
-
-	{
-		user ? (
-			<div class="toolbar card" id="toolbar">
-				<label>
-					道具
-					<select name="tool">
-						<option value="stroke">落書き</option>
-						<option value="displace">歪み</option>
-						<option value="text">文字</option>
-					</select>
-				</label>
-				<label class="only-displace" hidden>
-					歪み方
-					<select name="displaceMode">
-						<option value="smudge">なすりつけ</option>
-						<option value="bulge">膨らみ</option>
-						<option value="pinch">へこみ</option>
-						<option value="swirl">渦</option>
-					</select>
-				</label>
-				<label class="only-displace" hidden>
-					強さ
-					<input type="range" name="strength" min="-1" max="1" step="0.05" value="0.6" />
-				</label>
-				<label class="not-displace">
-					色
-					<input type="color" name="color" value="#ff0066" />
-				</label>
-				<label>
-					太さ
-					<input type="range" name="size" min="0.002" max="0.06" step="0.002" value="0.012" />
-				</label>
-				<label class="only-stroke">
-					合成
-					<select name="blend">
-						<option value="normal">通常</option>
-						<option value="multiply">乗算</option>
-						<option value="screen">スクリーン</option>
-						<option value="overlay">オーバーレイ</option>
-					</select>
-				</label>
-				<button type="button" id="undo">取り消す</button>
-			</div>
-		) : (
-			<p class="muted">
-				<a href="/signin">ログイン</a>すると、この画像に落書きや歪みを加えられます。
-			</p>
-		)
-	}
-
-	<p class="error" id="error"></p>
+	<PostCanvas
+		client:load
+		postId={post.id}
+		imageUrl={mediaUrl(post.imageKey)}
+		aspectRatio={post.aspectRatio}
+		thumbnailUpdatedAt={post.thumbnailUpdatedAt}
+		canEdit={user !== null}
+	/>
 </Base>
-
-<style>
-	.stage {
-		display: flex;
-		justify-content: center;
-		background: #000;
-		padding: 0;
-	}
-
-	canvas {
-		display: block;
-		max-width: 100%;
-		height: auto;
-		touch-action: none;
-		cursor: crosshair;
-	}
-
-	.toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: end;
-		gap: 0.75rem;
-		margin-top: 1rem;
-		padding: 0.75rem;
-	}
-
-	.toolbar label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-</style>
-
-<script
-	define:vars={{
-		postId: post.id,
-		imageUrl: mediaUrl(post.imageKey),
-		aspectRatio: post.aspectRatio,
-		thumbnailUpdatedAt: post.thumbnailUpdatedAt,
-	}}
->
-	window.__post = { postId, imageUrl, aspectRatio, thumbnailUpdatedAt };
-</script>
-
-<script>
-	import { PostEditor } from "../../lib/editor";
-	import type { EditorSettings } from "../../lib/editor";
-
-	const { postId, imageUrl, aspectRatio, thumbnailUpdatedAt } = (
-		window as unknown as {
-			__post: {
-				postId: string;
-				imageUrl: string;
-				aspectRatio: number;
-				thumbnailUpdatedAt: number | null;
-			};
-		}
-	).__post;
-
-	const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-	const statusEl = document.getElementById("status")!;
-	const errorEl = document.getElementById("error")!;
-
-	const editor = new PostEditor(canvas, {
-		onStatus: (status) => {
-			statusEl.textContent = { connecting: "接続中…", open: "ライブ", closed: "切断" }[status];
-		},
-		onError: (message) => {
-			errorEl.textContent = message;
-		},
-	});
-
-	try {
-		await editor.loadImage(imageUrl, aspectRatio);
-	} catch {
-		errorEl.textContent = "画像を読み込めませんでした。";
-	}
-	editor.connect(postId, thumbnailUpdatedAt);
-
-	const toolbar = document.getElementById("toolbar");
-	if (toolbar) {
-		const sync = () => {
-			const value = (name: string) =>
-				(toolbar.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLSelectElement).value;
-
-			editor.settings = {
-				tool: value("tool") as EditorSettings["tool"],
-				color: value("color"),
-				size: Number(value("size")),
-				blend: value("blend") as EditorSettings["blend"],
-				displaceMode: value("displaceMode") as EditorSettings["displaceMode"],
-				strength: Number(value("strength")),
-			};
-
-			const tool = editor.settings.tool;
-			toolbar
-				.querySelectorAll<HTMLElement>(".only-displace")
-				.forEach((el) => (el.hidden = tool !== "displace"));
-			toolbar
-				.querySelectorAll<HTMLElement>(".not-displace")
-				.forEach((el) => (el.hidden = tool === "displace"));
-			toolbar
-				.querySelectorAll<HTMLElement>(".only-stroke")
-				.forEach((el) => (el.hidden = tool !== "stroke"));
-		};
-
-		toolbar.addEventListener("change", sync);
-		sync();
-
-		document.getElementById("undo")?.addEventListener("click", () => editor.undo());
-	}
-
-	addEventListener("beforeunload", () => editor.disconnect());
-</script>

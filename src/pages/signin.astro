@@ -1,4 +1,5 @@
 ---
+import SignInForm from "../components/SignInForm";
 import Base from "../layouts/Base.astro";
 
 if (Astro.locals.user) return Astro.redirect("/");
@@ -6,47 +7,5 @@ if (Astro.locals.user) return Astro.redirect("/");
 
 <Base title="ログイン">
 	<h1>ログイン</h1>
-
-	<form class="form" id="form">
-		<label>
-			メールアドレス
-			<input type="email" name="email" autocomplete="email" required />
-		</label>
-		<label>
-			パスワード
-			<input type="password" name="password" autocomplete="current-password" required />
-		</label>
-		<p class="error" id="error"></p>
-		<button class="primary" type="submit">ログイン</button>
-		<p class="muted">
-			アカウントがない場合は <a href="/signup">登録</a>。
-		</p>
-	</form>
+	<SignInForm client:load />
 </Base>
-
-<script>
-	import { authClient } from "../lib/auth-client";
-
-	const form = document.getElementById("form") as HTMLFormElement;
-	const errorEl = document.getElementById("error")!;
-
-	form.addEventListener("submit", async (event) => {
-		event.preventDefault();
-		const button = form.querySelector("button")!;
-		button.disabled = true;
-		errorEl.textContent = "";
-
-		const data = new FormData(form);
-		const { error } = await authClient.signIn.email({
-			email: String(data.get("email")),
-			password: String(data.get("password")),
-		});
-
-		if (error) {
-			errorEl.textContent = error.message ?? "ログインできませんでした";
-			button.disabled = false;
-			return;
-		}
-		location.href = "/";
-	});
-</script>

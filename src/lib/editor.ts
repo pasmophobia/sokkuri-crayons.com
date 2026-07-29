@@ -32,6 +32,18 @@ export type EditorSettings = {
 	blend: BlendMode;
 	displaceMode: DisplaceMode;
 	strength: number;
+	/** text ツールで書き込む文字。空なら text ツールは何も置かない。 */
+	text: string;
+};
+
+export const DEFAULT_SETTINGS: EditorSettings = {
+	tool: "stroke",
+	color: "#ff0066",
+	size: 0.012,
+	blend: "normal",
+	displaceMode: "smudge",
+	strength: 0.6,
+	text: "",
 };
 
 export type EditorEvents = {
@@ -69,14 +81,7 @@ export class PostEditor {
 	/** サムネイルを最後に焼いた時刻（サーバ時刻）。null なら未生成。 */
 	#thumbnailUpdatedAt: number | null = null;
 
-	settings: EditorSettings = {
-		tool: "stroke",
-		color: "#ff0066",
-		size: 0.012,
-		blend: "normal",
-		displaceMode: "smudge",
-		strength: 0.6,
-	};
+	settings: EditorSettings = { ...DEFAULT_SETTINGS };
 
 	constructor(canvas: HTMLCanvasElement, events: EditorEvents = {}) {
 		this.#canvas = canvas;
@@ -343,7 +348,7 @@ export class PostEditor {
 	}
 
 	#beginOp(point: Point): void {
-		const { tool, color, size, blend, displaceMode, strength } = this.settings;
+		const { tool, color, size, blend, displaceMode, strength, text } = this.settings;
 
 		let payload: OpPayload;
 		if (tool === "stroke") {
@@ -351,16 +356,10 @@ export class PostEditor {
 		} else if (tool === "displace") {
 			payload = { kind: "displace", points: [point], radius: size * 8, strength, mode: displaceMode };
 		} else {
-			const body = prompt("書き込む文字");
-			if (!body?.trim()) return;
-			payload = {
-				kind: "text",
-				at: point,
-				body: body.trim().slice(0, 140),
-				size: size * 4,
-				color,
-				rotation: 0,
-			};
+			// 文字は UI 側で入力させる。未入力なら置くものがない。
+			const body = text.trim();
+			if (!body) return;
+			payload = { kind: "text", at: point, body, size: size * 4, color, rotation: 0 };
 		}
 
 		const id = crypto.randomUUID();
