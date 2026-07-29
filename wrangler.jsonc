@@ -1,13 +1,24 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-07-29",
-	"compatibility_flags": ["global_fetch_strictly_public"],
+	// Agents SDK が node:async_hooks / node:diagnostics_channel を使う。
+	"compatibility_flags": ["global_fetch_strictly_public", "nodejs_compat"],
 	"name": "artc",
-	"main": "@astrojs/cloudflare/entrypoints/server",
+	"main": "./src/worker.ts",
 	"assets": {
 		"directory": "./dist",
 		"binding": "ASSETS"
 	},
+	"durable_objects": {
+		"bindings": [{ "name": "Post", "class_name": "Post" }]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			// Agents SDK は SQLite バックエンドの Durable Object を前提にしている。
+			"new_sqlite_classes": ["Post"]
+		}
+	],
 	"observability": {
 		"enabled": true
 	}
