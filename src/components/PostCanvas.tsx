@@ -45,12 +45,7 @@ const BLEND_MODES: { value: EditorSettings["blend"]; label: string }[] = [
 	{ value: "overlay", label: "オーバーレイ" },
 ];
 
-export default function PostCanvas({
-	postId,
-	imageUrl,
-	aspectRatio,
-	canEdit,
-}: Props) {
+export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: Props) {
 	const editorRef = useRef<PostEditor | null>(null);
 
 	const [connected, setConnected] = useState(false);
@@ -122,9 +117,7 @@ export default function PostCanvas({
 						道具
 						<select
 							value={settings.tool}
-							onChange={(event) =>
-								update("tool", event.target.value as EditorSettings["tool"])
-							}
+							onChange={(event) => update("tool", event.target.value as EditorSettings["tool"])}
 						>
 							{TOOLS.map((tool) => (
 								<option key={tool.value} value={tool.value}>
@@ -181,9 +174,7 @@ export default function PostCanvas({
 							合成
 							<select
 								value={settings.blend}
-								onChange={(event) =>
-									update("blend", event.target.value as EditorSettings["blend"])
-								}
+								onChange={(event) => update("blend", event.target.value as EditorSettings["blend"])}
 							>
 								{BLEND_MODES.map((blend) => (
 									<option key={blend.value} value={blend.value}>

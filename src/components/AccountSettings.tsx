@@ -50,7 +50,9 @@ export default function AccountSettings({ name, username, email }: Props) {
 					const value = String(form.get("name") ?? "").trim();
 					if (value === "") return { ok: false, message: "表示名を入力してください" };
 					const { error } = await authClient.updateUser({ name: value });
-					return error ? { ok: false, message: describe(error, "変更できませんでした") } : { ok: true };
+					return error
+						? { ok: false, message: describe(error, "変更できませんでした") }
+						: { ok: true };
 				}}
 			>
 				<label>
@@ -141,12 +143,7 @@ export default function AccountSettings({ name, username, email }: Props) {
 			>
 				<label>
 					現在のパスワード
-					<input
-						type="password"
-						name="currentPassword"
-						autoComplete="current-password"
-						required
-					/>
+					<input type="password" name="currentPassword" autoComplete="current-password" required />
 				</label>
 				<label>
 					新しいパスワード（8 文字以上）

@@ -112,9 +112,7 @@ export type PostState = {
 
 /** 描画に使うべき op だけを、描画順で返す。 */
 export function renderableOps(state: PostState): (CommittedOp | SubmittedOp)[] {
-	const committed = state.committedOps
-		.filter((op) => !op.undone)
-		.sort((a, b) => a.seq - b.seq);
+	const committed = state.committedOps.filter((op) => !op.undone).sort((a, b) => a.seq - b.seq);
 	const pending = [...state.pendingOps].sort((a, b) => a.startedAt - b.startedAt);
 	// 編集中のものは常に確定済みの上に乗せる。
 	return [...committed, ...pending];

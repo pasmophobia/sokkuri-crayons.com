@@ -103,12 +103,7 @@ function drawStroke(
 	ctx.stroke();
 }
 
-function drawText(
-	ctx: CanvasRenderingContext2D,
-	op: TextOp,
-	width: number,
-	height: number,
-): void {
+function drawText(ctx: CanvasRenderingContext2D, op: TextOp, width: number, height: number): void {
 	const short = Math.min(width, height);
 
 	ctx.save();
@@ -215,7 +210,15 @@ function warpDisc(
 			if (distance >= radius) continue;
 
 			const [sx, sy] = inverse(dx, dy, distance / radius);
-			sample(source, boxWidth, boxHeight, cx - left + sx - 0.5, cy - top + sy - 0.5, target.data, (y * boxWidth + x) * 4);
+			sample(
+				source,
+				boxWidth,
+				boxHeight,
+				cx - left + sx - 0.5,
+				cy - top + sy - 0.5,
+				target.data,
+				(y * boxWidth + x) * 4,
+			);
 		}
 	}
 

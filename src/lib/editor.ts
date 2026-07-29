@@ -272,7 +272,13 @@ export class PostEditor {
 		if (tool === "stroke") {
 			payload = { kind: "stroke", points: [point], color, width: size, blend };
 		} else if (tool === "displace") {
-			payload = { kind: "displace", points: [point], radius: size * 8, strength, mode: displaceMode };
+			payload = {
+				kind: "displace",
+				points: [point],
+				radius: size * 8,
+				strength,
+				mode: displaceMode,
+			};
 		} else {
 			// 文字は UI 側で入力させる。未入力なら置くものがない。
 			const body = text.trim();

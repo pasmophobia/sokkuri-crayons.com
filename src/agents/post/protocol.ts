@@ -12,7 +12,6 @@ import type {
 	DisplaceMode,
 	OpPayload,
 	Point,
-	PostMeta,
 	PostState,
 	SubmittedOp,
 	CommittedOp,

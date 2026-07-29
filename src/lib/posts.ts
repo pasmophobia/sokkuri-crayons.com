@@ -101,11 +101,7 @@ export async function getVisiblePost(
  * 投稿を消す。消せるのは投稿者だけなので、所有者の条件も同じ文に畳み込む。
  * 実際に 1 行消えたときだけ true。他人の投稿・存在しない ID はどちらも false。
  */
-export async function deletePost(
-	db: D1Database,
-	id: string,
-	authorId: string,
-): Promise<boolean> {
+export async function deletePost(db: D1Database, id: string, authorId: string): Promise<boolean> {
 	const { meta } = await db
 		.prepare(`delete from "post" where "id" = ?1 and "authorId" = ?2`)
 		.bind(id, authorId)

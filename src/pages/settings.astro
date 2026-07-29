@@ -45,7 +45,9 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
 							<dt>表示名</dt>
 							<dd>{account.name}</dd>
 							<dt>ユーザー名</dt>
-							<dd>{account.username ? `@${account.username}` : <span class="muted">未設定</span>}</dd>
+							<dd>
+								{account.username ? `@${account.username}` : <span class="muted">未設定</span>}
+							</dd>
 							<dt>メールアドレス</dt>
 							<dd>{account.email}</dd>
 							<dt>登録日</dt>
