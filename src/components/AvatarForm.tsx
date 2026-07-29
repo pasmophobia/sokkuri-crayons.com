@@ -9,6 +9,7 @@
 import { useRef, useState } from "react";
 
 import { authClient } from "../lib/auth-client";
+import { loadImage } from "../lib/image";
 import { AVATAR_SIZE, AVATAR_TYPE, mediaUrl } from "../lib/media";
 
 export default function AvatarForm({ current, name }: { current: string | null; name: string }) {
@@ -91,12 +92,7 @@ export default function AvatarForm({ current, name }: { current: string | null; 
 async function toSquareWebp(file: File): Promise<Blob> {
 	const url = URL.createObjectURL(file);
 	try {
-		const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-			const probe = new Image();
-			probe.onload = () => resolve(probe);
-			probe.onerror = () => reject(new Error("画像を読み込めませんでした"));
-			probe.src = url;
-		});
+		const image = await loadImage(url);
 
 		const side = Math.min(image.naturalWidth, image.naturalHeight);
 		const canvas = document.createElement("canvas");
