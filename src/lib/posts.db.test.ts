@@ -8,7 +8,14 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { getPost, getVisiblePost, insertPost, listPosts } from "./posts";
+import {
+	deletePost,
+	getPost,
+	getVisiblePost,
+	insertPost,
+	isImageKeyUnused,
+	listPosts,
+} from "./posts";
 import { requestFriendship, respondToRequest } from "./friends";
 import { resetDb, seedPost, seedUser } from "../test/seed";
 
@@ -133,5 +140,78 @@ describe("insertPost", () => {
 		});
 
 		expect((await listPosts(db, null)).map((p) => p.id)).toEqual(["new", "old"]);
+	});
+});
+
+describe("deletePost", () => {
+	beforeEach(async () => {
+		await seedPost({ id: "mine", authorId: "alice", visibility: "public" });
+	});
+
+	it("投稿者は自分の投稿を消せる", async () => {
+		expect(await deletePost(db, "mine", "alice")).toBe(true);
+		expect(await getPost(db, "mine")).toBeNull();
+	});
+
+	it("他人の投稿は消せず、行も残る", async () => {
+		expect(await deletePost(db, "mine", "stranger")).toBe(false);
+		expect(await deletePost(db, "mine", "friend")).toBe(false);
+		expect(await getPost(db, "mine")).not.toBeNull();
+	});
+
+	it("存在しない ID には false", async () => {
+		expect(await deletePost(db, "missing", "alice")).toBe(false);
+	});
+
+	it("二度消しても二度目は false", async () => {
+		expect(await deletePost(db, "mine", "alice")).toBe(true);
+		expect(await deletePost(db, "mine", "alice")).toBe(false);
+	});
+});
+
+describe("isImageKeyUnused", () => {
+	const key = "originals/3f2504e0-4f89-11d3-9a0c-0305e82c3301.jpg";
+
+	async function post(id: string, authorId: string) {
+		await insertPost(db, {
+			id,
+			authorId,
+			imageKey: key,
+			aspectRatio: 1,
+			caption: "",
+			visibility: "public",
+		});
+	}
+
+	it("誰も指していないキーは未使用", async () => {
+		expect(await isImageKeyUnused(db, key)).toBe(true);
+	});
+
+	it("投稿が 1 つでも指していれば使用中", async () => {
+		await post("a", "alice");
+		expect(await isImageKeyUnused(db, key)).toBe(false);
+	});
+
+	it("同じキーを 2 件が指しているとき、1 件消しても使用中のまま", async () => {
+		await post("a", "alice");
+		await post("b", "friend");
+
+		await deletePost(db, "a", "alice");
+		expect(await isImageKeyUnused(db, key)).toBe(false);
+
+		await deletePost(db, "b", "friend");
+		expect(await isImageKeyUnused(db, key)).toBe(true);
+	});
+
+	it("別のキーの投稿には影響されない", async () => {
+		await insertPost(db, {
+			id: "other",
+			authorId: "alice",
+			imageKey: "originals/11111111-1111-1111-1111-111111111111.jpg",
+			aspectRatio: 1,
+			caption: "",
+			visibility: "public",
+		});
+		expect(await isImageKeyUnused(db, key)).toBe(true);
 	});
 });
