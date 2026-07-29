@@ -97,6 +97,34 @@ export async function getVisiblePost(
 	return record ? toRow(record) : null;
 }
 
+/**
+ * 投稿を消す。消せるのは投稿者だけなので、所有者の条件も同じ文に畳み込む。
+ * 実際に 1 行消えたときだけ true。他人の投稿・存在しない ID はどちらも false。
+ */
+export async function deletePost(
+	db: D1Database,
+	id: string,
+	authorId: string,
+): Promise<boolean> {
+	const { meta } = await db
+		.prepare(`delete from "post" where "id" = ?1 and "authorId" = ?2`)
+		.bind(id, authorId)
+		.run();
+	return meta.changes > 0;
+}
+
+/**
+ * この元画像を指している投稿がもう無いか。
+ * 同じキーで 2 度投稿されている場合に、R2 の実体を巻き添えで消さないための確認。
+ */
+export async function isImageKeyUnused(db: D1Database, imageKey: string): Promise<boolean> {
+	const row = await db
+		.prepare(`select 1 as "found" from "post" where "imageKey" = ?1 limit 1`)
+		.bind(imageKey)
+		.first<{ found: number }>();
+	return row === null;
+}
+
 export async function insertPost(
 	db: D1Database,
 	input: {

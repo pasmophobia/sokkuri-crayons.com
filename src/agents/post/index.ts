@@ -187,6 +187,25 @@ export class Post extends Agent<Env, PostState> {
 		this.setState(this.#snapshot());
 	}
 
+	/**
+	 * 投稿が消されたときに `DELETE /api/posts/:id` から呼ばれる (Durable Object RPC)。
+	 * 見ている人を追い出してから、この DO ごと捨てる。
+	 *
+	 * `destroy()` は isolate を落とすので、呼び出し側には戻ってこないことがある。
+	 * 投げっぱなしで良いように、D1 の行はここへ来る前に消してある。
+	 */
+	async deletePost(): Promise<void> {
+		// 書き戻し待ちのタイマーが destroy 後に起きないよう、先に止める。
+		if (this.#flushTimer !== null) {
+			clearTimeout(this.#flushTimer);
+			this.#flushTimer = null;
+		}
+		for (const connection of this.getConnections()) {
+			connection.close(4404, "この投稿は削除されました");
+		}
+		await this.destroy();
+	}
+
 	// --- メッセージ処理 ---
 
 	#dispatch(connection: Connection<ConnectionState>, message: ClientMessage): void {

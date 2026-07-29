@@ -514,3 +514,33 @@ button.primary {
 	max-width: 100%;
 	border-radius: var(--radius);
 }
+
+/* --- 投稿の削除 --- */
+
+/* 道具から離し、間違って押しにくい位置に置く。 */
+.post-actions {
+	margin-top: 2rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--border);
+}
+
+.post-actions .actions {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.post-actions .muted {
+	margin-bottom: 0.75rem;
+	font-size: 0.85rem;
+}
+
+button.danger {
+	color: #ff8080;
+	border-color: #5a2430;
+}
+
+button.danger:hover:not(:disabled) {
+	color: #fff;
+	background: #8c1f36;
+	border-color: #8c1f36;
+}
