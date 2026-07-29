@@ -30,7 +30,7 @@
 		{
 			"binding": "DB",
 			"database_name": "sokkuri-crayons-auth",
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "d85d529a-58e0-48a0-9a83-f6aaa83ba6be",
 			"migrations_dir": "./migrations",
 		},
 	],
@@ -39,7 +39,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "AUTH_KV",
-			"id": "0000000000000000000000000000000000",
+			"id": "f9df675324a14b1d87bf38d935b7705e",
 		},
 	],
 	// 元画像とアイコン。実体は Terraform が作る。
