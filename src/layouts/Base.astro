@@ -1,0 +1,54 @@
+---
+import "../styles/global.css";
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+const user = Astro.locals.user;
+---
+
+<!doctype html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title} | artc</title>
+	</head>
+	<body>
+		<header class="site-header">
+			<a class="brand" href="/">artc</a>
+			<nav>
+				{
+					user ? (
+						<>
+							<a href="/posts/new">投稿する</a>
+							<span class="muted">{user.name}</span>
+							<button id="signout" type="button">
+								ログアウト
+							</button>
+						</>
+					) : (
+						<>
+							<a href="/signin">ログイン</a>
+							<a href="/signup">登録</a>
+						</>
+					)
+				}
+			</nav>
+		</header>
+		<main>
+			<slot />
+		</main>
+
+		<script>
+			import { authClient } from "../lib/auth-client";
+
+			document.getElementById("signout")?.addEventListener("click", async () => {
+				await authClient.signOut();
+				location.href = "/";
+			});
+		</script>
+	</body>
+</html>

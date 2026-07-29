@@ -1,0 +1,186 @@
+:root {
+	--bg: #0e0e11;
+	--surface: #17171c;
+	--surface-2: #1f1f27;
+	--border: #2c2c36;
+	--text: #e8e8ee;
+	--muted: #9a9aa8;
+	--accent: #ff0066;
+	--radius: 10px;
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: ui-sans-serif, system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+	line-height: 1.6;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+.site-header {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 0.85rem 1.25rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface);
+	position: sticky;
+	top: 0;
+	z-index: 10;
+}
+
+.site-header .brand {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--accent);
+}
+
+.site-header nav {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	font-size: 0.9rem;
+}
+
+main {
+	max-width: 60rem;
+	margin: 0 auto;
+	padding: 1.5rem 1.25rem 4rem;
+}
+
+h1 {
+	font-size: 1.4rem;
+	margin: 0 0 1rem;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+
+/* --- フォーム --- */
+
+.form {
+	max-width: 24rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+}
+
+.form label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+input,
+textarea,
+select {
+	font: inherit;
+	color: var(--text);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.5rem 0.65rem;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+	outline: 2px solid var(--accent);
+	outline-offset: -1px;
+}
+
+button {
+	font: inherit;
+	font-weight: 600;
+	color: var(--text);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.5rem 0.9rem;
+	cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+	border-color: var(--accent);
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+.error {
+	color: #ff8080;
+	font-size: 0.85rem;
+	min-height: 1.2em;
+}
+
+/* --- 一覧 --- */
+
+.feed {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	gap: 1rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.feed img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	object-fit: cover;
+	background: var(--surface-2);
+}
+
+.feed .meta {
+	padding: 0.6rem 0.75rem;
+	font-size: 0.85rem;
+}
+
+.feed .caption {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.empty {
+	border: 1px dashed var(--border);
+	border-radius: var(--radius);
+	padding: 3rem 1rem;
+	text-align: center;
+	color: var(--muted);
+}
