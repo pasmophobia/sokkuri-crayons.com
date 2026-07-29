@@ -10,7 +10,8 @@ const ACCEPT = Object.keys(ALLOWED_IMAGE_TYPES).join(",");
 const MAX_MB = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
 
 export default function NewPostForm({ friendCount }: { friendCount: number }) {
-	const [visibility, setVisibility] = useState<Visibility>("public");
+	// 既定はフレンドのみ。うっかり全世界に出るより、狭い方に倒す。
+	const [visibility, setVisibility] = useState<Visibility>("friends");
 	const [picked, setPicked] = useState<Picked | null>(null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
@@ -101,8 +102,8 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 					value={visibility}
 					onChange={(event) => setVisibility(event.target.value as Visibility)}
 				>
-					<option value="public">全体公開</option>
 					<option value="friends">フレンドのみ</option>
+					<option value="public">全体公開</option>
 				</select>
 			</label>
 			{visibility === "friends" && friendCount === 0 && (

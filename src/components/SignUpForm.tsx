@@ -16,6 +16,7 @@ export default function SignUpForm() {
 			name: String(form.get("name")),
 			email: String(form.get("email")),
 			password: String(form.get("password")),
+			username: String(form.get("username")),
 		});
 
 		if (failure) {
@@ -34,7 +35,19 @@ export default function SignUpForm() {
 				<input type="text" name="name" autoComplete="nickname" maxLength={40} required />
 			</label>
 			<label>
-				メールアドレス
+				ユーザー名（フレンドから探されるための ID／英数字と _）
+				<input
+					type="text"
+					name="username"
+					autoComplete="username"
+					minLength={3}
+					maxLength={20}
+					pattern="[A-Za-z0-9_]+"
+					required
+				/>
+			</label>
+			<label>
+				メールアドレス（ログイン用）
 				<input type="email" name="email" autoComplete="email" required />
 			</label>
 			<label>

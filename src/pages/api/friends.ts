@@ -6,7 +6,7 @@ import { removeFriendship, requestFriendship, respondToRequest } from "../../lib
 export const prerender = false;
 
 type Body =
-	| { action: "request"; email: string }
+	| { action: "request"; username: string }
 	| { action: "accept" | "decline"; userId: string }
 	| { action: "remove"; userId: string };
 
@@ -24,10 +24,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
 	switch (body?.action) {
 		case "request": {
-			if (typeof body.email !== "string" || !body.email.includes("@")) {
-				return Response.json({ message: "メールアドレスを入力してください" }, { status: 400 });
+			if (typeof body.username !== "string" || body.username.trim() === "") {
+				return Response.json({ message: "ユーザー名を入力してください" }, { status: 400 });
 			}
-			const outcome = await requestFriendship(env.DB, user.id, body.email);
+			const outcome = await requestFriendship(env.DB, user.id, body.username);
 			if (!outcome.ok) return Response.json({ message: outcome.reason }, { status: 400 });
 			return Response.json({ status: outcome.status });
 		}

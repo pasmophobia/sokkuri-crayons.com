@@ -4,10 +4,12 @@
  *   - KV  … secondary storage（セッションキャッシュ・レート制限・検証トークン）
  *
  * ログイン ID はメールアドレス。メール送信の口をまだ持っていないので、
- * 検証は要求しない。
+ * 検証は要求しない。ユーザー名 (username プラグイン) はログインには使わず、
+ * フレンド検索と表示のための一意な handle として持つ。
  */
 
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { username } from "better-auth/plugins";
 import { withCloudflare } from "better-auth-cloudflare";
 
 /**
@@ -24,6 +26,15 @@ export const authOptions = {
 		minPasswordLength: 8,
 		autoSignIn: true,
 	},
+	plugins: [
+		// ログイン ID はメールのまま。ユーザー名は人を探すための一意な handle。
+		username({
+			minUsernameLength: 3,
+			maxUsernameLength: 20,
+			// 既定は英数字と下線のみ。大小の違いで別人になると探しづらいので、
+			// 正規化（小文字化）は既定のまま使い、表示用は入力どおり残す。
+		}),
+	],
 	rateLimit: {
 		enabled: true,
 		// KV の TTL 下限が 60 秒なので、window はそれ以上でなければならない。

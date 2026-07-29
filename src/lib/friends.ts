@@ -11,7 +11,11 @@ export type FriendshipStatus = "pending" | "accepted";
 export type Friend = {
 	id: string;
 	name: string;
-	email: string;
+	/**
+	 * 表示用のユーザー名。入力どおりの大小を優先し、無ければ正規化済みの方を使う
+	 * （update-user 経由で設定すると displayUsername が空のままになるため）。
+	 */
+	displayUsername: string | null;
 };
 
 export type FriendRequest = Friend & { createdAt: number };
@@ -36,7 +40,7 @@ export async function areFriends(db: D1Database, a: string, b: string): Promise<
 export async function listFriends(db: D1Database, userId: string): Promise<Friend[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", u."email"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername"
 			 from "friendship" f
 			 join "user" u
 			   on u."id" = case when f."requesterId" = ?1 then f."addresseeId" else f."requesterId" end
@@ -56,7 +60,7 @@ export async function listIncomingRequests(
 ): Promise<FriendRequest[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", u."email", f."createdAt"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", f."createdAt"
 			 from "friendship" f
 			 join "user" u on u."id" = f."requesterId"
 			 where f."addresseeId" = ?1 and f."status" = 'pending'
@@ -74,7 +78,7 @@ export async function listOutgoingRequests(
 ): Promise<FriendRequest[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", u."email", f."createdAt"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", f."createdAt"
 			 from "friendship" f
 			 join "user" u on u."id" = f."addresseeId"
 			 where f."requesterId" = ?1 and f."status" = 'pending'
@@ -90,7 +94,10 @@ export type RequestOutcome =
 	| { ok: false; reason: string };
 
 /**
- * メールアドレスでフレンド申請を出す。
+ * ユーザー名でフレンド申請を出す。
+ *
+ * better-auth は username を小文字に正規化して保存するので、こちらも
+ * 小文字にして引く（大小違いで別人扱いになると探せない）。
  *
  * 相手から先に申請が来ていた場合は、新しい行を作らずその場で成立させる
  * （すれ違いで 2 行できると、どちらも pending のまま止まってしまう）。
@@ -98,14 +105,14 @@ export type RequestOutcome =
 export async function requestFriendship(
 	db: D1Database,
 	requesterId: string,
-	email: string,
+	username: string,
 ): Promise<RequestOutcome> {
 	const target = await db
-		.prepare(`select "id" from "user" where "email" = ?1`)
-		.bind(email.trim().toLowerCase())
+		.prepare(`select "id" from "user" where "username" = ?1`)
+		.bind(username.trim().toLowerCase())
 		.first<{ id: string }>();
 
-	if (!target) return { ok: false, reason: "そのメールアドレスのユーザーは見つかりません" };
+	if (!target) return { ok: false, reason: "そのユーザー名の人は見つかりません" };
 	if (target.id === requesterId) return { ok: false, reason: "自分には申請できません" };
 
 	const existing = await db

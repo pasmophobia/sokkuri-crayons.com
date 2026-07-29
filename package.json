@@ -13,7 +13,7 @@
 		"generate-types": "wrangler types",
 		"deploy": "astro build && wrangler deploy",
 		"cf-typegen": "wrangler types",
-		"auth:generate": "better-auth generate --config auth.config.ts --output migrations/0001_better_auth.sql -y",
+		"auth:generate": "better-auth generate --config auth.config.ts --output auth.schema.sql -y",
 		"db:migrate": "wrangler d1 migrations apply artc-auth --local",
 		"db:migrate:remote": "wrangler d1 migrations apply artc-auth --remote"
 	},

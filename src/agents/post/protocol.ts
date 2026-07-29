@@ -202,7 +202,11 @@ export function parseNewPostInput(raw: unknown): ParseResult<NewPostInput> {
 	if (caption.length > LIMITS.MAX_CAPTION_LENGTH) {
 		return fail(`caption must be at most ${LIMITS.MAX_CAPTION_LENGTH} characters`);
 	}
-	const visibility = VISIBILITIES.find((v) => v === raw.visibility);
+	// 省略されたら狭い方に倒す。クライアントの取りこぼしで全世界に出るより安全。
+	const visibility =
+		raw.visibility === undefined
+			? ("friends" as const)
+			: VISIBILITIES.find((v) => v === raw.visibility);
 	if (!visibility) return fail(`visibility must be one of ${VISIBILITIES.join(", ")}`);
 	return ok({ imageKey: raw.imageKey, aspectRatio, caption, visibility });
 }

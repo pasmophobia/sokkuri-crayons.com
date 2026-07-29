@@ -1,8 +1,7 @@
 /**
  * フレンドの申請・承認・解除。
  *
- * 相手を特定する手掛かりが今はメールアドレスしかないので、完全一致で探す
- * （表示名は一意でないため使えない）。ユーザー名を導入したらそちらに寄せたい。
+ * 相手はユーザー名で探す。表示名は一意でないので手掛かりにできない。
  */
 
 import { useState } from "react";
@@ -16,7 +15,7 @@ type Props = {
 };
 
 type Action =
-	| { action: "request"; email: string }
+	| { action: "request"; username: string }
 	| { action: "accept" | "decline" | "remove"; userId: string };
 
 export default function FriendManager({ friends, incoming, outgoing }: Props) {
@@ -60,13 +59,13 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 					className="form"
 					onSubmit={(event) => {
 						event.preventDefault();
-						const email = String(new FormData(event.currentTarget).get("email") ?? "");
-						void send({ action: "request", email });
+						const username = String(new FormData(event.currentTarget).get("username") ?? "");
+						void send({ action: "request", username });
 					}}
 				>
 					<label>
-						相手のメールアドレス
-						<input type="email" name="email" placeholder="friend@example.com" required />
+						相手のユーザー名
+						<input type="text" name="username" placeholder="artist_123" required />
 					</label>
 					<button className="primary" type="submit" disabled={pending}>
 						申請する
@@ -83,7 +82,8 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 						{incoming.map((person) => (
 							<li key={person.id}>
 								<span>
-									<strong>{person.name}</strong> <span className="muted">{person.email}</span>
+									<strong>{person.name}</strong>{" "}
+									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
 								</span>
 								<span className="actions">
 									<button
@@ -115,7 +115,8 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 						{outgoing.map((person) => (
 							<li key={person.id}>
 								<span>
-									<strong>{person.name}</strong> <span className="muted">{person.email}</span>
+									<strong>{person.name}</strong>{" "}
+									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
 								</span>
 								<button
 									type="button"
@@ -139,7 +140,8 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 						{friends.map((person) => (
 							<li key={person.id}>
 								<span>
-									<strong>{person.name}</strong> <span className="muted">{person.email}</span>
+									<strong>{person.name}</strong>{" "}
+									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
 								</span>
 								<button
 									type="button"
