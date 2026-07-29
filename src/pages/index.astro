@@ -9,11 +9,33 @@ import { listPosts } from "../lib/posts";
 const user = Astro.locals.user;
 const posts = await listPosts(env.DB, user?.id ?? null);
 const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" });
+
+/*
+ * 「他人の絵に描き込める」は見た目に出ない上に、フィードの慣習でもない。
+ * アイコンを 1 枚ごとに並べても「自分の投稿を編集」と読まれるだけなので、
+ * 冒頭で一度説明し、カードに触れたときだけ動詞を添える。
+ */
+const hint = user ? "この絵に描き込む" : "ログインして描き込む";
 ---
 
 <Base title="タイムライン">
 	<div class="feed-page">
 		<h1>タイムライン</h1>
+
+		{
+			posts.length > 0 && (
+				<p class="muted feed-intro">
+					{user ? (
+						"どの絵にも落書きや歪みを加えられます。開いてそのまま描けます。"
+					) : (
+						<>
+							<a href="/signin">ログイン</a>
+							すると、どの絵にも落書きや歪みを加えられます。
+						</>
+					)}
+				</p>
+			)
+		}
 
 		{
 			posts.length === 0 ? (
@@ -30,14 +52,17 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 					{posts.map((post) => (
 						<li class="card">
 							<a href={`/posts/${post.id}`}>
-								{/* 落書きは見る側のブラウザがその場で描く。画面に入った分だけ。 */}
-								<FeedThumbnail
-									client:visible
-									postId={post.id}
-									imageUrl={mediaUrl(post.imageKey)}
-									aspectRatio={post.aspectRatio}
-									caption={post.caption}
-								/>
+								<div class="shot">
+									{/* 落書きは見る側のブラウザがその場で描く。画面に入った分だけ。 */}
+									<FeedThumbnail
+										client:visible
+										postId={post.id}
+										imageUrl={mediaUrl(post.imageKey)}
+										aspectRatio={post.aspectRatio}
+										caption={post.caption}
+									/>
+									<span class="hint">{hint}</span>
+								</div>
 								<div class="meta">
 									<div class="byline">
 										{post.authorImage ? (
