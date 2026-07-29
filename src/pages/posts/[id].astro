@@ -4,19 +4,22 @@ import { env } from "cloudflare:workers";
 import PostCanvas from "../../components/PostCanvas";
 import Base from "../../layouts/Base.astro";
 import { mediaUrl } from "../../lib/media";
-import { getPost } from "../../lib/posts";
+import { getVisiblePost } from "../../lib/posts";
 
 const { id } = Astro.params;
-const post = id ? await getPost(env.DB, id) : null;
+const user = Astro.locals.user;
+const post = id ? await getVisiblePost(env.DB, id, user?.id ?? null) : null;
 if (!post) return new Response(null, { status: 404, statusText: "Not Found" });
 
-const user = Astro.locals.user;
 const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" });
 ---
 
 <Base title={post.caption || "投稿"}>
 	<h1>{post.caption || "（キャプションなし）"}</h1>
-	<p class="muted">{post.authorName} · {formatter.format(post.createdAt)}</p>
+	<p class="muted">
+		{post.authorName} · {formatter.format(post.createdAt)}
+		{post.visibility === "friends" && <span class="badge">フレンドのみ</span>}
+	</p>
 
 	<PostCanvas
 		client:load

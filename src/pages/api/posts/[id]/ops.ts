@@ -3,7 +3,7 @@ import type { APIRoute } from "astro";
 import { getAgentByName } from "agents";
 
 import type { Post } from "../../../../agents/post";
-import { getPost } from "../../../../lib/posts";
+import { getVisiblePost } from "../../../../lib/posts";
 
 export const prerender = false;
 
@@ -14,9 +14,10 @@ export const prerender = false;
  * 中身の検証も鮮度の管理もできない）。描けるのはブラウザだけなので、
  * 素材だけ渡して描画は見る側にやらせる。
  */
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
 	const id = params.id;
-	if (!id || !(await getPost(env.DB, id))) {
+	// 見えない投稿は「無い」扱い。存在の有無すら漏らさない。
+	if (!id || !(await getVisiblePost(env.DB, id, locals.user?.id ?? null))) {
 		return new Response(null, { status: 404 });
 	}
 

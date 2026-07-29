@@ -24,6 +24,7 @@ const user = Astro.locals.user;
 				{
 					user ? (
 						<>
+							<a href="/friends">フレンド</a>
 							<a href="/posts/new">投稿する</a>
 							<span class="muted">{user.name}</span>
 							<SignOutButton client:load />

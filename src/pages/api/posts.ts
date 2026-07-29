@@ -44,6 +44,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 		imageKey: parsed.value.imageKey,
 		aspectRatio: parsed.value.aspectRatio,
 		caption: parsed.value.caption,
+		visibility: parsed.value.visibility,
 	});
 
 	// キャンバス側にも同じメタ情報を渡しておく。ここで失敗しても投稿自体は
@@ -55,6 +56,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 		caption: parsed.value.caption,
 		authorId: user.id,
 		createdAt,
+		visibility: parsed.value.visibility,
 	});
 
 	return Response.json({ id }, { status: 201 });

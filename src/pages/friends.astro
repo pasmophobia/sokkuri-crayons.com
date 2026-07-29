@@ -1,0 +1,23 @@
+---
+import { env } from "cloudflare:workers";
+
+import FriendManager from "../components/FriendManager";
+import Base from "../layouts/Base.astro";
+import { listFriends, listIncomingRequests, listOutgoingRequests } from "../lib/friends";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect("/signin");
+
+const [friends, incoming, outgoing] = await Promise.all([
+	listFriends(env.DB, user.id),
+	listIncomingRequests(env.DB, user.id),
+	listOutgoingRequests(env.DB, user.id),
+]);
+---
+
+<Base title="フレンド">
+	<div class="feed-page">
+		<h1>フレンド</h1>
+		<FriendManager client:load friends={friends} incoming={incoming} outgoing={outgoing} />
+	</div>
+</Base>

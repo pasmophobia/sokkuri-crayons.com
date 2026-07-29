@@ -88,6 +88,9 @@ export type CommittedOp = OpBase & {
 	undone?: boolean;
 };
 
+/** 投稿の公開範囲。`friends` は投稿者と、その成立済みフレンドだけ。 */
+export type Visibility = "public" | "friends";
+
 /** 投稿そのもののメタ情報。元画像は R2 にアップロード済みである前提。 */
 export type PostMeta = {
 	/** R2 のオブジェクトキー。`/api/media/<key>` から配る。 */
@@ -97,6 +100,7 @@ export type PostMeta = {
 	caption: string;
 	authorId: string;
 	createdAt: number;
+	visibility: Visibility;
 };
 
 /** `Post` Agent が保持する状態。 */

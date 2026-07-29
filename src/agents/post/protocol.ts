@@ -16,6 +16,7 @@ import type {
 	PostState,
 	SubmittedOp,
 	CommittedOp,
+	Visibility,
 } from "./ops";
 
 export const LIMITS = {
@@ -181,7 +182,14 @@ function parsePayload(raw: unknown): ParseResult<OpPayload> {
 }
 
 /** 新規投稿のフォーム入力。作成は WebSocket ではなく `POST /api/posts` が受ける。 */
-export type NewPostInput = { imageKey: string; aspectRatio: number; caption: string };
+export type NewPostInput = {
+	imageKey: string;
+	aspectRatio: number;
+	caption: string;
+	visibility: Visibility;
+};
+
+const VISIBILITIES: readonly Visibility[] = ["public", "friends"];
 
 export function parseNewPostInput(raw: unknown): ParseResult<NewPostInput> {
 	if (!isRecord(raw)) return fail("body must be a json object");
@@ -194,7 +202,9 @@ export function parseNewPostInput(raw: unknown): ParseResult<NewPostInput> {
 	if (caption.length > LIMITS.MAX_CAPTION_LENGTH) {
 		return fail(`caption must be at most ${LIMITS.MAX_CAPTION_LENGTH} characters`);
 	}
-	return ok({ imageKey: raw.imageKey, aspectRatio, caption });
+	const visibility = VISIBILITIES.find((v) => v === raw.visibility);
+	if (!visibility) return fail(`visibility must be one of ${VISIBILITIES.join(", ")}`);
+	return ok({ imageKey: raw.imageKey, aspectRatio, caption, visibility });
 }
 
 /** 受信した生フレームを `ClientMessage` に変換する。 */

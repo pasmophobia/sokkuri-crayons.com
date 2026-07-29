@@ -25,6 +25,7 @@
 import { Agent, type Connection, type ConnectionContext, type WSMessage } from "agents";
 
 import { createAuth } from "../../auth";
+import { areFriends } from "../../lib/friends";
 import type { CommittedOp, PostMeta, PostState, SubmittedOp } from "./ops";
 import {
 	LIMITS,
@@ -126,6 +127,15 @@ export class Post extends Agent<Env, PostState> {
 		// better-auth のセッションをそのまま引ける。
 		const identity = await this.#identify(ctx);
 		connection.setState(identity);
+
+		// 二重の防壁。本来の関門は `src/worker.ts` 側で、そちらは WebSocket が
+		// 張られる前に弾く。ここまで来た時点では SDK が `cf_agent_state` を
+		// 送り終えているので、ここだけでは情報漏れを止められない。
+		if (!(await this.#mayView(identity.userId))) {
+			this.#send(connection, { type: "error", message: "この投稿は公開されていません" });
+			connection.close(4403, "forbidden");
+			return;
+		}
 
 		// 前の接続が残していった編集中の op を掃除してから、現状を渡す。
 		this.#sweepPending();
@@ -338,6 +348,30 @@ export class Post extends Agent<Env, PostState> {
 	 * WebSocket のアップグレード要求に載っている Cookie から better-auth の
 	 * セッションを引く。セッションが無い / 引けない場合は閲覧者として扱う。
 	 */
+	/**
+	 * この閲覧者に投稿を見せてよいか。判断の権威は D1 側の post 行。
+	 * フレンド関係は後から変わるので、`#post` の写しではなく都度引く。
+	 */
+	async #mayView(userId: string | null): Promise<boolean> {
+		try {
+			const row = await this.env.DB.prepare(
+				`select "authorId", "visibility" from "post" where "id" = ?1`,
+			)
+				.bind(this.name)
+				.first<{ authorId: string; visibility: string }>();
+
+			// 投稿レコードがまだ無い＝作成直後。作成経路は認証済みなので通す。
+			if (!row) return true;
+			if (row.visibility !== "friends") return true;
+			if (userId === null) return false;
+			if (userId === row.authorId) return true;
+			return await areFriends(this.env.DB, userId, row.authorId);
+		} catch (error) {
+			console.error("failed to check post visibility", error);
+			return false;
+		}
+	}
+
 	async #identify(ctx: ConnectionContext): Promise<ConnectionState> {
 		try {
 			const auth = createAuth({

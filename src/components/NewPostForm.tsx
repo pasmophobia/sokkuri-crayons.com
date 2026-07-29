@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 
+import type { Visibility } from "../agents/post/ops";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../lib/media";
 
 /** 選択された画像と、そこから測ったアスペクト比・プレビュー URL。 */
@@ -8,7 +9,8 @@ type Picked = { file: File; aspectRatio: number; previewUrl: string };
 const ACCEPT = Object.keys(ALLOWED_IMAGE_TYPES).join(",");
 const MAX_MB = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
 
-export default function NewPostForm() {
+export default function NewPostForm({ friendCount }: { friendCount: number }) {
+	const [visibility, setVisibility] = useState<Visibility>("public");
 	const [picked, setPicked] = useState<Picked | null>(null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
@@ -66,7 +68,12 @@ export default function NewPostForm() {
 			const created = await fetch("/api/posts", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ imageKey: key, aspectRatio: picked.aspectRatio, caption }),
+				body: JSON.stringify({
+					imageKey: key,
+					aspectRatio: picked.aspectRatio,
+					caption,
+					visibility,
+				}),
 			});
 			if (!created.ok) throw await message(created, "投稿できませんでした");
 
@@ -88,12 +95,32 @@ export default function NewPostForm() {
 				キャプション
 				<textarea name="caption" rows={3} maxLength={280} />
 			</label>
+			<label>
+				公開範囲
+				<select
+					value={visibility}
+					onChange={(event) => setVisibility(event.target.value as Visibility)}
+				>
+					<option value="public">全体公開</option>
+					<option value="friends">フレンドのみ</option>
+				</select>
+			</label>
+			{visibility === "friends" && friendCount === 0 && (
+				<p className="muted">
+					いまフレンドがいないので、この投稿は自分だけが見られます。
+					<a href="/friends">フレンドを追加</a>すると共有されます。
+				</p>
+			)}
 			<p className="error">{error}</p>
 			{picked && <img className="preview" src={picked.previewUrl} alt="" />}
 			<button className="primary" type="submit" disabled={!picked || pending}>
 				投稿する
 			</button>
-			<p className="muted">投稿すると、誰でもこの画像に落書きや歪みを加えられます。</p>
+			<p className="muted">
+				{visibility === "public"
+					? "投稿すると、誰でもこの画像に落書きや歪みを加えられます。"
+					: "フレンドだけが閲覧でき、落書きや歪みを加えられます。"}
+			</p>
 		</form>
 	);
 }
