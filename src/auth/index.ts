@@ -3,12 +3,15 @@
  *   - D1  … user / session / account の永続化
  *   - KV  … secondary storage（セッションキャッシュ・レート制限・検証トークン）
  *
- * ログイン ID はメールアドレス。メール送信の口をまだ持っていないので、
- * 検証は要求しない。ユーザー名 (username プラグイン) はログインには使わず、
- * フレンド検索と表示のための一意な handle として持つ。
+ * ログイン ID はメールアドレス。確認メールとパスワード再設定は Cloudflare
+ * Email Service（`EMAIL` バインディング）から送る。
+ *
+ * ユーザー名 (username プラグイン) はログインには使わず、フレンド検索と表示の
+ * ための一意な handle として持つ。
  */
 
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { sendMail, template } from "../lib/mailer";
 import { username } from "better-auth/plugins";
 import { withCloudflare } from "better-auth-cloudflare";
 
@@ -20,18 +23,21 @@ import { withCloudflare } from "better-auth-cloudflare";
 export const authOptions = {
 	emailAndPassword: {
 		enabled: true,
-		// メール送信をまだ用意していないため、検証は課さない。
-		// 送信できるようになったらここを true にする。
-		requireEmailVerification: false,
+		requireEmailVerification: true,
 		minPasswordLength: 8,
 		autoSignIn: true,
+	},
+	emailVerification: {
+		sendOnSignUp: true,
+		// 確認できた時点でそのまま入れるようにする。もう一度ログインさせる必要がない。
+		autoSignInAfterVerification: true,
+		expiresIn: 60 * 60 * 24,
 	},
 	user: {
 		changeEmail: {
 			enabled: true,
-			// メール送信の口がまだ無いので、確認メールを挟まずその場で差し替える。
-			// 効くのは現在のアドレスが未検証のときだけ（検証を導入したら、
-			// 検証済みの利用者は自動的に確認メール経由に切り替わる）。
+			// 未検証のうちは確認を挟まず差し替える。検証済みの利用者は
+			// better-auth が自動的に新アドレスへの確認メール経由に切り替える。
 			updateEmailWithoutVerification: true,
 		},
 	},
@@ -83,7 +89,43 @@ export function createAuth(options: {
 				// 並びだけが違う。実体は同じバインディングなので型だけ合わせる。
 				kv: env.AUTH_KV as unknown as Parameters<typeof withCloudflare>[0]["kv"],
 			},
-			authOptions,
+			{
+				...authOptions,
+				// 送信には env が要るので、共有の authOptions ではなくここで足す
+				// （authOptions はスキーマ生成 CLI とも共有していて env を持てない）。
+				emailVerification: {
+					...authOptions.emailVerification,
+					sendVerificationEmail: async ({ user, url }) => {
+						await sendMail(env, {
+							to: user.email,
+							subject: "メールアドレスの確認 | そっくりクレヨン",
+							...template({
+								heading: "メールアドレスを確認してください",
+								body: "そっくりクレヨンのアカウントを有効にするには、下のボタンを押してください。",
+								actionLabel: "確認する",
+								url,
+								note: "このリンクは 24 時間で切れます。心当たりがなければ、このメールは無視してください。",
+							}),
+						});
+					},
+				},
+				emailAndPassword: {
+					...authOptions.emailAndPassword,
+					sendResetPassword: async ({ user, url }) => {
+						await sendMail(env, {
+							to: user.email,
+							subject: "パスワードの再設定 | そっくりクレヨン",
+							...template({
+								heading: "パスワードを再設定します",
+								body: "下のボタンから新しいパスワードを設定してください。",
+								actionLabel: "再設定する",
+								url,
+								note: "心当たりがなければ、このメールは無視してください。パスワードは変わりません。",
+							}),
+						});
+					},
+				},
+			},
 		),
 	});
 }

@@ -5,6 +5,7 @@ import { authClient } from "../lib/auth-client";
 export default function SignUpForm() {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
+	const [sent, setSent] = useState(false);
 
 	async function submit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -24,8 +25,17 @@ export default function SignUpForm() {
 			setPending(false);
 			return;
 		}
-		// autoSignIn が有効なので、登録がそのままログインになる。
-		location.href = "/";
+		// 確認メールを踏むまでログインできないので、ここでは移動しない。
+		setSent(true);
+		setPending(false);
+	}
+
+	if (sent) {
+		return (
+			<p className="muted">
+				確認メールを送りました。本文のリンクを開くとアカウントが有効になります。
+			</p>
+		);
 	}
 
 	return (

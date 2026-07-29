@@ -24,6 +24,15 @@
 	// 元画像と、op を焼き込んだサムネイル。
 	// `wrangler r2 bucket create artc-media` で作っておくこと。
 	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "artc-media" }],
+	// 確認メール・パスワード再設定の送信 (Cloudflare Email Service)。
+	//
+	// `remote: true` は付けない。付けると vite が起動時に実アカウントへ接続しに行き、
+	// 資格情報が無い／アカウントが複数ある環境では dev サーバごと起動しなくなる。
+	// ローカルでは送信されず、リンクは端末のログに出る（src/lib/mailer.ts）。
+	// 実際に送るには Workers Paid と、Cloudflare DNS 上のドメインを
+	// Email Service に登録することが要る。
+	"send_email": [{ "name": "EMAIL" }],
+	"vars": { "MAIL_FROM": "no-reply@example.com" },
 	"durable_objects": {
 		"bindings": [{ "name": "Post", "class_name": "Post" }],
 	},

@@ -1,5 +1,10 @@
 ## Development
 
+If a React island throws `Invalid hook call` during SSR, restart the dev
+server (`astro dev stop`, then start again). Vite re-optimizes dependencies
+mid-session, and after that reload the SSR renderer and the components end up
+with different React instances. It does not affect `astro build`.
+
 When starting the dev server, use background mode:
 
 ```
@@ -92,6 +97,25 @@ Diff it against the applied migrations and hand-write the delta as a new
 numbered file in `migrations/`, then `bun run db:migrate`. Do not point the
 generator at an existing migration: it emits the whole schema, so it will
 overwrite an already-applied file rather than describe the change.
+
+## Mail
+
+Verification and password-reset mail goes out through Cloudflare Email Service
+via the `EMAIL` (`send_email`) binding. Delivering for real needs Workers Paid
+and a domain on Cloudflare DNS onboarded to Email Service; set the sender with
+the `MAIL_FROM` var.
+
+Locally, miniflare simulates the binding and writes each message to
+`.wrangler/tmp/email/` as `.txt` and `.html`. Nothing is delivered, so pull
+verification and reset links out of those files to walk the flows.
+
+The binding deliberately has no `remote: true`. With it, the Vite plugin opens
+a session against the real account at startup and the dev server refuses to
+boot when credentials are missing or several accounts are available.
+
+Sign-in requires a verified address. Accounts created before verification
+existed were marked verified in `0007_grandfather_verified.sql` so they were
+not locked out.
 
 ## Documentation
 
