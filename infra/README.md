@@ -8,9 +8,9 @@ Terraform が持つのは**デプロイをまたいで残るもの**だけ。
 
 | リソース | 用途 |
 | --- | --- |
-| D1 `artc-auth` | better-auth の user / session / account |
-| KV `artc-auth-kv` | better-auth の secondary storage |
-| R2 `artc-media` | 投稿の元画像とアイコン |
+| D1 `sokkuri-crayons-auth` | better-auth の user / session / account |
+| KV `sokkuri-crayons-auth-kv` | better-auth の secondary storage |
+| R2 `sokkuri-crayons-media` | 投稿の元画像とアイコン |
 
 Worker 本体・Durable Object・バインディングの結線は **wrangler が持つ**。ビルド成果物は
 Astro が吐くので、同じスクリプトを両方から管理すると必ず食い違う。`wrangler.jsonc`

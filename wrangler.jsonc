@@ -32,8 +32,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "artc-auth",
-			"database_id": "d47fff62-b2f6-4ab3-8684-4ced41e6c942",
+			"database_name": "sokkuri-crayons-auth",
+			"database_id": "00000000-0000-0000-0000-000000000000",
 			"migrations_dir": "./migrations",
 		},
 	],
@@ -42,14 +42,14 @@
 	"kv_namespaces": [
 		{
 			"binding": "AUTH_KV",
-			"id": "6a9c1973e7224e7aa03d86b857ad9162"
+			"id": "0000000000000000000000000000000000"
 		}
 	],
 	// 元画像とアイコン。実体は Terraform が作る。
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
-			"bucket_name": "artc-media"
+			"bucket_name": "sokkuri-crayons-media"
 		}
 	],
 	// 確認メール・パスワード再設定の送信 (Cloudflare Email Service)。

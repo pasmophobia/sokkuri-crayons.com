@@ -4,9 +4,9 @@ variable "account_id" {
 }
 
 variable "name_prefix" {
-  description = "作成するリソース名の接頭辞。環境を分けたい場合はここを変える（例: artc-staging）。"
+  description = "作成するリソース名の接頭辞。環境を分けたい場合はここを変える（例: sokkuri-crayons-staging）。"
   type        = string
-  default     = "artc"
+  default     = "sokkuri-crayons"
 }
 
 variable "d1_primary_location_hint" {

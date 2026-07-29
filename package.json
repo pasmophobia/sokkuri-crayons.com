@@ -22,8 +22,8 @@
 		"deploy": "astro build && wrangler deploy",
 		"cf-typegen": "wrangler types",
 		"auth:generate": "better-auth generate --config auth.config.ts --output auth.schema.sql -y",
-		"db:migrate": "wrangler d1 migrations apply artc-auth --local",
-		"db:migrate:remote": "wrangler d1 migrations apply artc-auth --remote",
+		"db:migrate": "wrangler d1 migrations apply sokkuri-crayons-auth --local",
+		"db:migrate:remote": "wrangler d1 migrations apply sokkuri-crayons-auth --remote",
 		"infra:sync": "node infra/sync-wrangler.mjs"
 	},
 	"dependencies": {
