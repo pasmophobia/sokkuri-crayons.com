@@ -19,6 +19,7 @@ import type {
 } from "../agents/post/ops";
 import { renderableOps } from "../agents/post/ops";
 import type { ClientMessage, ServerMessage } from "../agents/post/protocol";
+import { THUMBNAIL_MAX_WIDTH, THUMBNAIL_TYPE } from "./media";
 import { renderPost } from "./render";
 
 export type Tool = "stroke" | "displace" | "text";
@@ -42,6 +43,9 @@ export type EditorEvents = {
 /** 点の送信をまとめる間隔。ここを短くすると滑らかになるが通信量が増える。 */
 const EXTEND_INTERVAL_MS = 50;
 
+/** 編集が落ち着いてからサムネイルを焼くまでの待ち時間。 */
+const THUMBNAIL_DEBOUNCE_MS = 4000;
+
 export class PostEditor {
 	#canvas: HTMLCanvasElement;
 	#ctx: CanvasRenderingContext2D;
@@ -58,6 +62,8 @@ export class PostEditor {
 	#outbox: Point[] = [];
 	#extendTimer: ReturnType<typeof setInterval> | null = null;
 	#frame = 0;
+	#postId: string | null = null;
+	#thumbnailTimer: ReturnType<typeof setTimeout> | null = null;
 
 	settings: EditorSettings = {
 		tool: "stroke",
@@ -100,6 +106,7 @@ export class PostEditor {
 	}
 
 	connect(postId: string): void {
+		this.#postId = postId;
 		this.#events.onStatus?.("connecting");
 		const scheme = location.protocol === "https:" ? "wss:" : "ws:";
 		const socket = new WebSocket(`${scheme}//${location.host}/agents/post/${postId}`);
@@ -118,6 +125,8 @@ export class PostEditor {
 
 	disconnect(): void {
 		this.#stopExtendTimer();
+		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
+		this.#thumbnailTimer = null;
 		this.#socket?.close();
 		this.#socket = null;
 	}
@@ -157,6 +166,7 @@ export class PostEditor {
 			case "op:committed":
 				this.#pending.delete(message.op.id);
 				this.#committed.set(message.op.id, message.op);
+				this.#scheduleThumbnail();
 				return this.#draw();
 
 			case "op:cancelled":
@@ -166,6 +176,7 @@ export class PostEditor {
 			case "op:undone": {
 				const op = this.#committed.get(message.id);
 				if (op) op.undone = true;
+				this.#scheduleThumbnail();
 				return this.#draw();
 			}
 
@@ -201,6 +212,51 @@ export class PostEditor {
 			committedOps: [...this.#committed.values()],
 			pendingOps: [...this.#pending.values()],
 		};
+	}
+
+	// --- サムネイル ---
+
+	/**
+	 * 編集が落ち着いたら、いまのキャンバスを縮小して一覧用に焼き直す。
+	 *
+	 * Workers に Canvas が無く op を再生できるのはブラウザだけなので、
+	 * 描画済みのこちらから上げる。開いている全員が上げに来るが、サーバ側が
+	 * 焼き直し間隔で間引くので実際に書かれるのは 1 通だけ。
+	 */
+	#scheduleThumbnail(): void {
+		if (!this.signedIn || !this.#postId) return;
+		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
+		this.#thumbnailTimer = setTimeout(() => {
+			this.#thumbnailTimer = null;
+			void this.#pushThumbnail();
+		}, THUMBNAIL_DEBOUNCE_MS);
+	}
+
+	async #pushThumbnail(): Promise<void> {
+		const postId = this.#postId;
+		if (!postId) return;
+
+		const source = this.#canvas;
+		const scale = Math.min(1, THUMBNAIL_MAX_WIDTH / source.width);
+		const thumb = document.createElement("canvas");
+		thumb.width = Math.max(1, Math.round(source.width * scale));
+		thumb.height = Math.max(1, Math.round(source.height * scale));
+		thumb.getContext("2d")?.drawImage(source, 0, 0, thumb.width, thumb.height);
+
+		const blob = await new Promise<Blob | null>((resolve) =>
+			thumb.toBlob(resolve, THUMBNAIL_TYPE, 0.8),
+		);
+		if (!blob) return;
+
+		try {
+			await fetch(`/api/posts/${postId}/thumbnail`, {
+				method: "PUT",
+				headers: { "content-type": THUMBNAIL_TYPE },
+				body: blob,
+			});
+		} catch {
+			// 一覧の見た目が少し古くなるだけなので、失敗しても編集は続行させる。
+		}
 	}
 
 	// --- 入力 ---
