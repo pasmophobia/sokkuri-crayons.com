@@ -64,6 +64,10 @@ export class PostEditor {
 	#frame = 0;
 	#postId: string | null = null;
 	#thumbnailTimer: ReturnType<typeof setTimeout> | null = null;
+	/** サーバのサムネイルに未反映の変更があるか。焼けたら下ろす。 */
+	#thumbnailDirty = false;
+	/** サムネイルを最後に焼いた時刻（サーバ時刻）。null なら未生成。 */
+	#thumbnailUpdatedAt: number | null = null;
 
 	settings: EditorSettings = {
 		tool: "stroke",
@@ -105,8 +109,9 @@ export class PostEditor {
 		this.#draw();
 	}
 
-	connect(postId: string): void {
+	connect(postId: string, thumbnailUpdatedAt: number | null = null): void {
 		this.#postId = postId;
+		this.#thumbnailUpdatedAt = thumbnailUpdatedAt;
 		this.#events.onStatus?.("connecting");
 		const scheme = location.protocol === "https:" ? "wss:" : "ws:";
 		const socket = new WebSocket(`${scheme}//${location.host}/agents/post/${postId}`);
@@ -144,6 +149,9 @@ export class PostEditor {
 				this.#userId = message.you;
 				this.#events.onIdentity?.(message.you, message.displayName);
 				this.#sync(message.state);
+				// サムネイルより新しい op があるなら、開いた時点で焼き直す。
+				// これがないと、編集した本人が去ったあと誰も焼き直さない。
+				if (this.#thumbnailIsStale()) this.#markThumbnailStale();
 				return;
 			}
 			// サーバが state を flush したときの全体同期。差分を取りこぼしても
@@ -166,7 +174,7 @@ export class PostEditor {
 			case "op:committed":
 				this.#pending.delete(message.op.id);
 				this.#committed.set(message.op.id, message.op);
-				this.#scheduleThumbnail();
+				this.#markThumbnailStale();
 				return this.#draw();
 
 			case "op:cancelled":
@@ -176,7 +184,7 @@ export class PostEditor {
 			case "op:undone": {
 				const op = this.#committed.get(message.id);
 				if (op) op.undone = true;
-				this.#scheduleThumbnail();
+				this.#markThumbnailStale();
 				return this.#draw();
 			}
 
@@ -202,8 +210,17 @@ export class PostEditor {
 		if (this.#frame) return;
 		this.#frame = requestAnimationFrame(() => {
 			this.#frame = 0;
-			renderPost(this.#ctx, this.#image, renderableOps(this.#snapshot()));
+			this.#renderNow();
 		});
+	}
+
+	/** rAF を待たずにいま描く。サムネイルを焼く直前など、確実に最新にしたいとき用。 */
+	#renderNow(): void {
+		if (this.#frame) {
+			cancelAnimationFrame(this.#frame);
+			this.#frame = 0;
+		}
+		renderPost(this.#ctx, this.#image, renderableOps(this.#snapshot()));
 	}
 
 	#snapshot(): PostState {
@@ -216,25 +233,45 @@ export class PostEditor {
 
 	// --- サムネイル ---
 
+	/** サーバのサムネイルより新しい op を持っているか。 */
+	#thumbnailIsStale(): boolean {
+		let newest = 0;
+		for (const op of this.#committed.values()) {
+			if (op.committedAt > newest) newest = op.committedAt;
+		}
+		if (newest === 0) return false;
+		return this.#thumbnailUpdatedAt === null || newest > this.#thumbnailUpdatedAt;
+	}
+
+	#markThumbnailStale(): void {
+		this.#thumbnailDirty = true;
+		this.#scheduleThumbnail(THUMBNAIL_DEBOUNCE_MS);
+	}
+
 	/**
 	 * 編集が落ち着いたら、いまのキャンバスを縮小して一覧用に焼き直す。
 	 *
 	 * Workers に Canvas が無く op を再生できるのはブラウザだけなので、
-	 * 描画済みのこちらから上げる。開いている全員が上げに来るが、サーバ側が
-	 * 焼き直し間隔で間引くので実際に書かれるのは 1 通だけ。
+	 * 描画済みのこちらから上げる。開いている全員が上げに来るが、権利を取れるのは
+	 * 1 人だけ。取れなかった側は焼けていない変更を抱えたまま待ち、間隔が明けたら
+	 * 出し直す（焼けたら #thumbnailDirty が下りて止まる）。
 	 */
-	#scheduleThumbnail(): void {
-		if (!this.signedIn || !this.#postId) return;
+	#scheduleThumbnail(delayMs: number): void {
+		if (!this.signedIn || !this.#postId || !this.#thumbnailDirty) return;
 		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
 		this.#thumbnailTimer = setTimeout(() => {
 			this.#thumbnailTimer = null;
 			void this.#pushThumbnail();
-		}, THUMBNAIL_DEBOUNCE_MS);
+		}, delayMs);
 	}
 
 	async #pushThumbnail(): Promise<void> {
 		const postId = this.#postId;
-		if (!postId) return;
+		if (!postId || !this.#thumbnailDirty) return;
+
+		// 待っている間に描画が rAF 待ちのまま止まっていることがある
+		// （背景タブでは rAF が回らない）。焼く直前に必ず追いつかせる。
+		this.#renderNow();
 
 		const source = this.#canvas;
 		const scale = Math.min(1, THUMBNAIL_MAX_WIDTH / source.width);
@@ -249,11 +286,24 @@ export class PostEditor {
 		if (!blob) return;
 
 		try {
-			await fetch(`/api/posts/${postId}/thumbnail`, {
+			const response = await fetch(`/api/posts/${postId}/thumbnail`, {
 				method: "PUT",
 				headers: { "content-type": THUMBNAIL_TYPE },
 				body: blob,
 			});
+
+			if (response.ok) {
+				this.#thumbnailDirty = false;
+				this.#thumbnailUpdatedAt = Date.now();
+				return;
+			}
+
+			// 他の誰かが直前に焼いた。こちらの変更はまだ載っていないかもしれないので、
+			// 間隔が明けたら出し直す。同時に待っている全員が同じ瞬間に殺到しないよう散らす。
+			if (response.status === 429) {
+				const retryAfterMs = Number(response.headers.get("retry-after") ?? 30) * 1000;
+				this.#scheduleThumbnail(retryAfterMs + Math.random() * 3000);
+			}
 		} catch {
 			// 一覧の見た目が少し古くなるだけなので、失敗しても編集は続行させる。
 		}

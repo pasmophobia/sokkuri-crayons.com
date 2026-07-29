@@ -70,22 +70,43 @@ export async function insertPost(
 		.run();
 }
 
+export type ThumbnailClaim =
+	| { claimed: true }
+	| { claimed: false; thumbnailUpdatedAt: number | null; retryAfterMs: number };
+
 /**
- * サムネイルの世代を進める。直近に焼かれたばかりなら false を返す。
- * 同じ投稿を見ている全クライアントが一斉に焼きに来るのを間引くため。
+ * サムネイルを焼く権利を取る。同じ投稿を見ている全クライアントが一斉に
+ * 焼きに来るのを間引くため、直近に焼かれたばかりなら取れない。
+ *
+ * 取れなかった側には「いつなら焼けるか」を返す。ここを黙って捨てると、
+ * 編集セッションの最後の一枚 —— 一番新しくて一番重要なやつ —— が
+ * 落ちたまま誰も焼き直さない。
  */
-export async function touchThumbnail(
+export async function claimThumbnail(
 	db: D1Database,
 	postId: string,
 	minIntervalMs: number,
-): Promise<boolean> {
+): Promise<ThumbnailClaim> {
+	const now = Date.now();
 	const { meta } = await db
 		.prepare(
 			`update "post" set "thumbnailUpdatedAt" = ?2
 			 where "id" = ?1
 			   and ("thumbnailUpdatedAt" is null or "thumbnailUpdatedAt" < ?3)`,
 		)
-		.bind(postId, Date.now(), Date.now() - minIntervalMs)
+		.bind(postId, now, now - minIntervalMs)
 		.run();
-	return (meta.changes ?? 0) > 0;
+	if ((meta.changes ?? 0) > 0) return { claimed: true };
+
+	const row = await db
+		.prepare(`select "thumbnailUpdatedAt" from "post" where "id" = ?1`)
+		.bind(postId)
+		.first<{ thumbnailUpdatedAt: number | null }>();
+	const last = row?.thumbnailUpdatedAt ?? null;
+
+	return {
+		claimed: false,
+		thumbnailUpdatedAt: last,
+		retryAfterMs: last === null ? minIntervalMs : Math.max(0, last + minIntervalMs - now),
+	};
 }

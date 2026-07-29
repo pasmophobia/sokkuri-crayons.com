@@ -111,17 +111,29 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 	}
 </style>
 
-<script define:vars={{ postId: post.id, imageUrl: mediaUrl(post.imageKey), aspectRatio: post.aspectRatio }}>
-	window.__post = { postId, imageUrl, aspectRatio };
+<script
+	define:vars={{
+		postId: post.id,
+		imageUrl: mediaUrl(post.imageKey),
+		aspectRatio: post.aspectRatio,
+		thumbnailUpdatedAt: post.thumbnailUpdatedAt,
+	}}
+>
+	window.__post = { postId, imageUrl, aspectRatio, thumbnailUpdatedAt };
 </script>
 
 <script>
 	import { PostEditor } from "../../lib/editor";
 	import type { EditorSettings } from "../../lib/editor";
 
-	const { postId, imageUrl, aspectRatio } = (
+	const { postId, imageUrl, aspectRatio, thumbnailUpdatedAt } = (
 		window as unknown as {
-			__post: { postId: string; imageUrl: string; aspectRatio: number };
+			__post: {
+				postId: string;
+				imageUrl: string;
+				aspectRatio: number;
+				thumbnailUpdatedAt: number | null;
+			};
 		}
 	).__post;
 
@@ -143,7 +155,7 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 	} catch {
 		errorEl.textContent = "画像を読み込めませんでした。";
 	}
-	editor.connect(postId);
+	editor.connect(postId, thumbnailUpdatedAt);
 
 	const toolbar = document.getElementById("toolbar");
 	if (toolbar) {

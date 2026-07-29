@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 
 import { MAX_UPLOAD_BYTES, THUMBNAIL_TYPE, thumbnailKey } from "../../../../lib/media";
-import { getPost, touchThumbnail } from "../../../../lib/posts";
+import { claimThumbnail, getPost } from "../../../../lib/posts";
 
 export const prerender = false;
 
@@ -14,9 +14,9 @@ const MIN_REBAKE_INTERVAL_MS = 30_000;
  *
  * Workers には Canvas が無く、op を再生できるのはブラウザだけなので、
  * 描画済みのクライアントに書き出してもらう形にしている。中身がキャンバスと
- * 一致していることをサーバ側では検証できない。ただしサムネイルは
- * 誰かが投稿を開くたびに焼き直されるので、おかしなものが上がっても
- * 次の閲覧者によって上書きされる。
+ * 一致していることをサーバ側では検証できない。ただし、サムネイルより新しい
+ * op を持つクライアントは投稿を開いた時点で焼き直しに来るので、おかしなものが
+ * 上がっても次の閲覧者によって上書きされる。
  */
 export const PUT: APIRoute = async ({ params, request, locals }) => {
 	if (!locals.user) {
@@ -33,14 +33,23 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
 		return Response.json({ message: `content-type must be ${THUMBNAIL_TYPE}` }, { status: 415 });
 	}
 
-	// 世代の更新に成功した場合だけ焼く。落ちた側は他の誰かが焼いたということ。
-	if (!(await touchThumbnail(env.DB, id, MIN_REBAKE_INTERVAL_MS))) {
-		return new Response(null, { status: 204 });
-	}
-
+	// 中身を先に検めてから権利を取る。壊れた本文で焼き直し間隔を無駄に消費しない。
 	const body = await request.arrayBuffer();
 	if (body.byteLength === 0 || body.byteLength > MAX_UPLOAD_BYTES) {
 		return Response.json({ message: "invalid thumbnail" }, { status: 400 });
+	}
+
+	const claim = await claimThumbnail(env.DB, id, MIN_REBAKE_INTERVAL_MS);
+	if (!claim.claimed) {
+		// 黙って捨てず、いつなら焼けるかを返す。クライアントはまだ焼けていない
+		// 変更を抱えていれば、この時刻以降に出し直す。
+		return Response.json(
+			{ skipped: true, thumbnailUpdatedAt: claim.thumbnailUpdatedAt },
+			{
+				status: 429,
+				headers: { "retry-after": String(Math.ceil(claim.retryAfterMs / 1000)) },
+			},
+		);
 	}
 
 	await env.MEDIA.put(thumbnailKey(id), body, { httpMetadata: { contentType } });
