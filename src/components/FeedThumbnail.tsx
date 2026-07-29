@@ -22,8 +22,11 @@ type Props = {
 	caption: string;
 };
 
-/** サムネイルの描画幅。歪みは画素単位で効くので、大きくしすぎない。 */
-const THUMBNAIL_WIDTH = 640;
+/**
+ * 描画幅。表示幅（1 カラムで約 600px）より少し大きく取り、高精細ディスプレイでも
+ * 眠くならない程度にする。歪みは画素単位で効くので上げすぎない。
+ */
+const THUMBNAIL_WIDTH = 960;
 
 export default function FeedThumbnail({ postId, imageUrl, aspectRatio, caption }: Props) {
 	const [drawn, setDrawn] = useState(false);
