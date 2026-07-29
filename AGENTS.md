@@ -22,6 +22,17 @@ cp .dev.vars.example .dev.vars   # then: openssl rand -base64 32
 bun run db:migrate               # applies migrations/ to the local D1
 ```
 
+The renderer needs a Rust toolchain with the wasm target:
+
+```
+rustup target add wasm32-unknown-unknown
+bun run wasm:build               # crates/render -> src/wasm/render.wasm
+```
+
+`dev`, `build` and `test` all run `wasm:build` first, so the artifact cannot
+go stale. Running the `astro` CLI directly (`astro dev --background`) skips
+that, so build it once by hand after a fresh checkout.
+
 `wrangler.jsonc` ships placeholder `database_id` / KV `id` values, which are
 fine for local development. Real infrastructure is Terraform's job — see
 `infra/README.md`. After `terraform apply`, `bun run infra:sync` writes the
@@ -78,6 +89,41 @@ Two things to know before adding tests:
 
 Astro's `getViteConfig()` is unusable here: `@cloudflare/vite-plugin` rejects the
 `resolve.external` that Vitest sets on the SSR environment.
+
+## Rendering
+
+`src/lib/render.ts` replays a post's ops onto a canvas. Lines and text stay on
+Canvas2D — antialiasing, blend modes and font rasterisation are not worth
+reproducing. Displacement is different: it reads pixels back and rewrites them,
+so it lives in `src/lib/warp.ts`, which has two interchangeable implementations.
+
+- `crates/render` — Rust compiled to `wasm32-unknown-unknown`. A bare cdylib,
+  no wasm-bindgen: everything crossing the boundary is a number or a slice of
+  linear memory, so there is nothing for glue code to do. It has no allocator
+  either, just `memory.grow` over `__heap_base`.
+- `warpJs()` in the same file — the same arithmetic in TypeScript. It runs
+  during SSR, in tests, and in the browser until the wasm finishes loading.
+  Nothing waits on the wasm; the first frame may be JS and the next wasm.
+
+`warp.test.ts` runs both over the same buffers and demands byte equality. That
+is the only thing keeping them honest, so extend it when you touch either side.
+Equality is structural rather than lucky: `sin`, `cos` and `pow` are imported
+into the wasm from the host's `Math`, so both implementations call the same
+functions. That also dropped libm from the binary — 15KB to 4.7KB — and made
+`bulge` / `pinch` faster than Rust's own `powf`.
+
+Two things cost more than the arithmetic, and both are handled outside the wasm:
+
+- `getImageData` / `putImageData` per point. Consecutive displacement ops are
+  batched into one rectangle, split again when the union grows by more than a
+  new rectangle would cost (`BATCH_OVERHEAD_PIXELS`).
+- Replaying the whole history every frame. `PostEditor` bakes the image and the
+  committed ops into an offscreen canvas and only re-applies pending ops per
+  frame, rebuilding that layer when the committed set changes.
+
+Workers and workerd forbid compiling wasm at runtime, so the browser fetches
+`render.wasm` as a Vite asset while tests import it as a `WebAssembly.Module`.
+Both forms are declared in `src/env.d.ts`.
 
 ## Auth
 

@@ -22,7 +22,7 @@ import type {
 } from "../agents/post/ops";
 import { renderableOps } from "../agents/post/ops";
 import type { ClientMessage, ServerMessage } from "../agents/post/protocol";
-import { renderPost } from "./render";
+import { applyOps, renderPost } from "./render";
 
 export type Tool = "stroke" | "displace" | "text";
 
@@ -72,6 +72,16 @@ export class PostEditor {
 	#pending = new Map<string, SubmittedOp>();
 	#userId: string | null = null;
 
+	/**
+	 * 元画像と確定済み op だけを焼いた下地。
+	 *
+	 * 1 ストロークのあいだ、確定済みの中身は動かない。にもかかわらず毎フレーム
+	 * 全部を焼き直すと、他人のぶんも含めた歪みの読み書きが点を打つたびに走る。
+	 * ここに取っておいて、毎フレーム重ねるのは未確定ぶんだけにする。
+	 */
+	#layer: HTMLCanvasElement | null = null;
+	#layerStale = true;
+
 	/** いま自分が描いている op。 */
 	#active: { id: string; payload: OpPayload } | null = null;
 	#outbox: Point[] = [];
@@ -108,6 +118,7 @@ export class PostEditor {
 
 		this.#resize(Math.min(MAX_CANVAS_WIDTH, image.naturalWidth), aspectRatio);
 		this.#image = image;
+		this.#layerStale = true;
 		this.#draw();
 	}
 
@@ -115,12 +126,15 @@ export class PostEditor {
 	#resize(width: number, aspectRatio: number): void {
 		this.#canvas.width = width;
 		this.#canvas.height = Math.round(width / (aspectRatio || 1));
+		this.#layerStale = true;
 		this.#draw();
 	}
 
 	/** キャンバスから離れるときに、抱えているタイマーを落とす。 */
 	dispose(): void {
 		this.#stopExtendTimer();
+		this.#layer = null;
+		this.#layerStale = true;
 	}
 
 	/** 接続が切れたとき。送っても届かないので点の送出を止める。 */
@@ -177,6 +191,7 @@ export class PostEditor {
 			case "op:committed":
 				this.#pending.delete(message.op.id);
 				this.#committed.set(message.op.id, message.op);
+				this.#layerStale = true;
 				return this.#draw();
 
 			case "op:cancelled":
@@ -186,6 +201,7 @@ export class PostEditor {
 			case "op:undone": {
 				const op = this.#committed.get(message.id);
 				if (op) op.undone = true;
+				this.#layerStale = true;
 				return this.#draw();
 			}
 
@@ -200,6 +216,7 @@ export class PostEditor {
 	#sync(state: PostState): void {
 		this.#committed = new Map(state.committedOps.map((op) => [op.id, op]));
 		this.#pending = new Map(state.pendingOps.map((op) => [op.id, op]));
+		this.#layerStale = true;
 		// 自分が描いている最中の op はサーバの flush より新しいことがあるので、
 		// 手元のものを残しておく。
 		this.#draw();
@@ -221,7 +238,48 @@ export class PostEditor {
 			cancelAnimationFrame(this.#frame);
 			this.#frame = 0;
 		}
-		renderPost(this.#ctx, this.#image, renderableOps(this.#snapshot()));
+
+		const layer = this.#committedLayer();
+		if (!layer) {
+			// 下地を用意できないときは、その場で全部焼く。
+			renderPost(this.#ctx, this.#image, renderableOps(this.#snapshot()));
+			return;
+		}
+
+		const ctx = this.#ctx;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.globalCompositeOperation = "source-over";
+		ctx.clearRect(0, 0, layer.width, layer.height);
+		// 同じ寸法・等倍・透明な下地の上なので、これは画素の複写になる。
+		ctx.drawImage(layer, 0, 0);
+		applyOps(ctx, this.#renderable([], [...this.#pending.values()]));
+	}
+
+	/** 元画像と確定済み op を焼いた下地。作れないときだけ null。 */
+	#committedLayer(): HTMLCanvasElement | null {
+		const { width, height } = this.#canvas;
+		if (width === 0 || height === 0) return null;
+
+		const layer = (this.#layer ??= document.createElement("canvas"));
+		if (layer.width !== width || layer.height !== height) {
+			layer.width = width;
+			layer.height = height;
+			this.#layerStale = true;
+		}
+		if (!this.#layerStale) return layer;
+
+		// 歪みがこの下地を読み戻す。
+		const ctx = layer.getContext("2d", { willReadFrequently: true });
+		if (!ctx) return null;
+
+		renderPost(ctx, this.#image, this.#renderable([...this.#committed.values()], []));
+		this.#layerStale = false;
+		return layer;
+	}
+
+	/** 描画順の決め方は 1 か所に寄せる。下地と未確定ぶんで別々に呼ぶ。 */
+	#renderable(committedOps: CommittedOp[], pendingOps: SubmittedOp[]) {
+		return renderableOps({ post: null, committedOps, pendingOps });
 	}
 
 	#snapshot(): PostState {
