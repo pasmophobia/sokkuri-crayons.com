@@ -22,9 +22,14 @@ cp .dev.vars.example .dev.vars   # then: openssl rand -base64 32
 bun run db:migrate               # applies migrations/ to the local D1
 ```
 
-`wrangler.jsonc` ships placeholder `database_id` / KV `id` values. They are
-fine for local development; replace them with real ones (`wrangler d1 create
-artc-auth`, `wrangler kv namespace create AUTH_KV`) before deploying.
+`wrangler.jsonc` ships placeholder `database_id` / KV `id` values, which are
+fine for local development. Real infrastructure is Terraform's job — see
+`infra/README.md`. After `terraform apply`, `bun run infra:sync` writes the
+generated IDs back into `wrangler.jsonc`.
+
+Terraform owns only what outlives a deploy (D1, KV, R2). The Worker, its
+Durable Objects and every binding stay in `wrangler.jsonc`, since Astro
+produces the script and managing it from both sides would drift.
 
 ## Checks
 

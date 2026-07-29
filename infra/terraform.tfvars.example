@@ -1,0 +1,11 @@
+# cp terraform.tfvars.example terraform.tfvars して埋める。
+# 認証は環境変数で渡す: export CLOUDFLARE_API_TOKEN=...
+
+account_id = ""
+
+# 環境ごとに分けたい場合だけ変える
+# name_prefix = "artc-staging"
+
+# 地域を寄せたい場合だけ指定する
+# d1_primary_location_hint = "apac"
+# r2_location              = "APAC"
