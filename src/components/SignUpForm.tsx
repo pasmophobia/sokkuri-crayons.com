@@ -35,7 +35,7 @@ export default function SignUpForm() {
 				<input type="text" name="name" autoComplete="nickname" maxLength={40} required />
 			</label>
 			<label>
-				ユーザー名（フレンドから探されるための ID／英数字と _）
+				ユーザー名（英数字と _、3〜20 文字）
 				<input
 					type="text"
 					name="username"

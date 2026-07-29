@@ -10,7 +10,7 @@ if (!user) return Astro.redirect("/signin");
 
 const account = await env.DB.prepare(
 	`select u."name", u."email", u."image", u."createdAt",
-	        coalesce(u."displayUsername", u."username") as "handle",
+	        coalesce(u."displayUsername", u."username") as "username",
 	        (select count(*) from "post" p where p."authorId" = u."id") as "posts",
 	        (select count(*) from "friendship" f
 	          where f."status" = 'accepted'
@@ -23,7 +23,7 @@ const account = await env.DB.prepare(
 		email: string;
 		image: string | null;
 		createdAt: string;
-		handle: string | null;
+		username: string | null;
 		posts: number;
 		friends: number;
 	}>();
@@ -45,7 +45,7 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
 							<dt>表示名</dt>
 							<dd>{account.name}</dd>
 							<dt>ユーザー名</dt>
-							<dd>{account.handle ? `@${account.handle}` : <span class="muted">未設定</span>}</dd>
+							<dd>{account.username ? `@${account.username}` : <span class="muted">未設定</span>}</dd>
 							<dt>メールアドレス</dt>
 							<dd>{account.email}</dd>
 							<dt>登録日</dt>
@@ -61,8 +61,8 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
 
 					<section>
 						<h2>ユーザー名</h2>
-						<p class="muted">フレンド申請で相手に伝える ID です。</p>
-						<UsernameForm client:load current={account.handle} />
+						<p class="muted">フレンドを探してもらうときに相手へ伝える名前です。</p>
+						<UsernameForm client:load current={account.username} />
 					</section>
 				</>
 			)

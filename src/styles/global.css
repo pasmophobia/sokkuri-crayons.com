@@ -335,14 +335,14 @@ button.primary {
 	font-size: 0.9rem;
 }
 
-.my-handle {
+.my-username {
 	display: flex;
 	align-items: center;
 	gap: 0.6rem;
 	margin-bottom: 0.4rem;
 }
 
-.my-handle code {
+.my-username code {
 	font-size: 1.1rem;
 	font-weight: 700;
 	color: var(--text);

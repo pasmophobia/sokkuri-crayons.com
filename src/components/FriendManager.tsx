@@ -10,8 +10,8 @@ import type { Friend, FriendRequest } from "../lib/friends";
 import { mediaUrl } from "../lib/media";
 
 type Props = {
-	/** 自分のフレンド ID。相手に伝えるために出す。未設定なら null。 */
-	myHandle: string | null;
+	/** 自分のユーザー名。相手に伝えるために出す。未設定なら null。 */
+	myUsername: string | null;
 	friends: Friend[];
 	incoming: FriendRequest[];
 	outgoing: FriendRequest[];
@@ -21,7 +21,7 @@ type Action =
 	| { action: "request"; username: string }
 	| { action: "accept" | "decline" | "remove"; userId: string };
 
-export default function FriendManager({ myHandle, friends, incoming, outgoing }: Props) {
+export default function FriendManager({ myUsername, friends, incoming, outgoing }: Props) {
 	const [copied, setCopied] = useState(false);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
@@ -58,14 +58,14 @@ export default function FriendManager({ myHandle, friends, incoming, outgoing }:
 	return (
 		<div className="friends">
 			<section>
-				<h2>あなたのフレンド ID</h2>
-				{myHandle ? (
-					<div className="my-handle">
-						<code>@{myHandle}</code>
+				<h2>あなたのユーザー名</h2>
+				{myUsername ? (
+					<div className="my-username">
+						<code>@{myUsername}</code>
 						<button
 							type="button"
 							onClick={async () => {
-								await navigator.clipboard.writeText(`@${myHandle}`);
+								await navigator.clipboard.writeText(`@${myUsername}`);
 								setCopied(true);
 								setTimeout(() => setCopied(false), 2000);
 							}}

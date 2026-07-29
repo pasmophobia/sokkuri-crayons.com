@@ -13,10 +13,10 @@ const [friends, incoming, outgoing, me] = await Promise.all([
 	listIncomingRequests(env.DB, user.id),
 	listOutgoingRequests(env.DB, user.id),
 	env.DB.prepare(
-		`select coalesce("displayUsername", "username") as "handle" from "user" where "id" = ?1`,
+		`select coalesce("displayUsername", "username") as "username" from "user" where "id" = ?1`,
 	)
 		.bind(user.id)
-		.first<{ handle: string | null }>(),
+		.first<{ username: string | null }>(),
 ]);
 ---
 
@@ -25,7 +25,7 @@ const [friends, incoming, outgoing, me] = await Promise.all([
 		<h1>フレンド</h1>
 		<FriendManager
 			client:load
-			myHandle={me?.handle ?? null}
+			myUsername={me?.username ?? null}
 			friends={friends}
 			incoming={incoming}
 			outgoing={outgoing}
