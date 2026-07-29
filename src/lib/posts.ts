@@ -9,12 +9,15 @@ import type { PostMeta, Visibility } from "../agents/post/ops";
 export type PostRow = PostMeta & {
 	id: string;
 	authorName: string;
+	/** 投稿者のアイコン（R2 キー）。未設定なら null。 */
+	authorImage: string | null;
 };
 
 type PostRecord = {
 	id: string;
 	authorId: string;
 	authorName: string | null;
+	authorImage: string | null;
 	imageKey: string;
 	aspectRatio: number;
 	caption: string;
@@ -23,7 +26,7 @@ type PostRecord = {
 };
 
 const SELECT = `
-	select p."id", p."authorId", u."name" as "authorName", p."imageKey",
+	select p."id", p."authorId", u."name" as "authorName", u."image" as "authorImage", p."imageKey",
 	       p."aspectRatio", p."caption", p."createdAt", p."visibility"
 	from "post" p
 	join "user" u on u."id" = p."authorId"
@@ -50,6 +53,7 @@ function toRow(record: PostRecord): PostRow {
 		id: record.id,
 		authorId: record.authorId,
 		authorName: record.authorName ?? "名無し",
+		authorImage: record.authorImage,
 		imageKey: record.imageKey,
 		aspectRatio: record.aspectRatio,
 		caption: record.caption,

@@ -206,6 +206,102 @@ button.primary {
 	overflow-wrap: anywhere;
 }
 
+/* --- アイコン --- */
+
+.avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 50%;
+	object-fit: cover;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: var(--muted);
+	text-transform: uppercase;
+	overflow: hidden;
+}
+
+.avatar-lg {
+	width: 5rem;
+	height: 5rem;
+	font-size: 2rem;
+}
+
+.site-header .me {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	text-decoration: none;
+}
+
+/* 投稿者の行。アイコン・名前・日時・公開範囲を 1 行に並べる。 */
+.byline {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	font-size: 0.9rem;
+	margin: 0 0 0.35rem;
+}
+
+.account {
+	display: flex;
+	gap: 1.25rem;
+	align-items: flex-start;
+	flex-wrap: wrap;
+	padding: 1.25rem;
+	margin-bottom: 2rem;
+}
+
+.account dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.35rem 1.25rem;
+	margin: 0;
+	font-size: 0.9rem;
+	min-width: 16rem;
+}
+
+.account dt {
+	color: var(--muted);
+}
+
+.account dd {
+	margin: 0;
+}
+
+.avatar-form {
+	display: flex;
+	align-items: center;
+	gap: 0.9rem;
+}
+
+.avatar-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	align-items: flex-start;
+}
+
+/* file input は隠して、ラベルをボタンに見せる。 */
+.file-button {
+	font-weight: 600;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.5rem 0.9rem;
+	cursor: pointer;
+}
+
+.file-button:hover {
+	border-color: var(--accent);
+}
+
 /* --- フレンド --- */
 
 .friends section {
@@ -237,6 +333,12 @@ button.primary {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	font-size: 0.9rem;
+}
+
+.people .who {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 }
 
 .people .actions {

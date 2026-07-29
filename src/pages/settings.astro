@@ -1,22 +1,71 @@
 ---
 import { env } from "cloudflare:workers";
 
+import AvatarForm from "../components/AvatarForm";
 import UsernameForm from "../components/UsernameForm";
 import Base from "../layouts/Base.astro";
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/signin");
 
-const row = await env.DB.prepare(`select coalesce("displayUsername", "username") as "displayUsername" from "user" where "id" = ?1`)
+const account = await env.DB.prepare(
+	`select u."name", u."email", u."image", u."createdAt",
+	        coalesce(u."displayUsername", u."username") as "handle",
+	        (select count(*) from "post" p where p."authorId" = u."id") as "posts",
+	        (select count(*) from "friendship" f
+	          where f."status" = 'accepted'
+	            and (f."requesterId" = u."id" or f."addresseeId" = u."id")) as "friends"
+	 from "user" u where u."id" = ?1`,
+)
 	.bind(user.id)
-	.first<{ displayUsername: string | null }>();
+	.first<{
+		name: string;
+		email: string;
+		image: string | null;
+		createdAt: string;
+		handle: string | null;
+		posts: number;
+		friends: number;
+	}>();
+
+const joined = account?.createdAt ? new Date(account.createdAt) : null;
+const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
 ---
 
-<Base title="設定">
+<Base title="アカウント">
 	<div class="feed-page">
-		<h1>設定</h1>
-		<h2>ユーザー名</h2>
-		<p class="muted">フレンド申請で相手に伝える ID です。</p>
-		<UsernameForm client:load current={row?.displayUsername ?? null} />
+		<h1>アカウント</h1>
+
+		{
+			account && (
+				<>
+					<section class="card account">
+						<AvatarForm client:load current={account.image} name={account.name} />
+						<dl>
+							<dt>表示名</dt>
+							<dd>{account.name}</dd>
+							<dt>ユーザー名</dt>
+							<dd>{account.handle ? `@${account.handle}` : <span class="muted">未設定</span>}</dd>
+							<dt>メールアドレス</dt>
+							<dd>{account.email}</dd>
+							<dt>登録日</dt>
+							<dd>{joined ? formatter.format(joined) : "—"}</dd>
+							<dt>投稿</dt>
+							<dd>{account.posts}</dd>
+							<dt>フレンド</dt>
+							<dd>
+								<a href="/friends">{account.friends}</a>
+							</dd>
+						</dl>
+					</section>
+
+					<section>
+						<h2>ユーザー名</h2>
+						<p class="muted">フレンド申請で相手に伝える ID です。</p>
+						<UsernameForm client:load current={account.handle} />
+					</section>
+				</>
+			)
+		}
 	</div>
 </Base>

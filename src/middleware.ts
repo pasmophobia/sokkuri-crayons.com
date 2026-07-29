@@ -19,7 +19,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
 		});
 		const session = await auth.api.getSession({ headers: context.request.headers });
 		context.locals.user = session
-			? { id: session.user.id, name: session.user.name, email: session.user.email }
+			? {
+					id: session.user.id,
+					name: session.user.name,
+					email: session.user.email,
+					image: session.user.image ?? null,
+				}
 			: null;
 	} catch (error) {
 		// 認証基盤が落ちても閲覧まで巻き添えにしない。未ログイン扱いで続行する。

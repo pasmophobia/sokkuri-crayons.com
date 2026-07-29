@@ -39,11 +39,17 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 								caption={post.caption}
 							/>
 							<div class="meta">
-								<div class="caption">{post.caption || "（キャプションなし）"}</div>
-								<div class="muted">
-									{post.authorName} · {formatter.format(post.createdAt)}
+								<div class="byline">
+									{post.authorImage ? (
+										<img class="avatar" src={mediaUrl(post.authorImage)} alt="" />
+									) : (
+										<span class="avatar avatar-blank">{post.authorName.slice(0, 1)}</span>
+									)}
+									<span>{post.authorName}</span>
+									<span class="muted">{formatter.format(post.createdAt)}</span>
 									{post.visibility === "friends" && <span class="badge">フレンドのみ</span>}
 								</div>
+								<div class="caption">{post.caption || "（キャプションなし）"}</div>
 							</div>
 						</a>
 					</li>

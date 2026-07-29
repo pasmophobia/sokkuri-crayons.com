@@ -16,6 +16,8 @@ export type Friend = {
 	 * （update-user 経由で設定すると displayUsername が空のままになるため）。
 	 */
 	displayUsername: string | null;
+	/** アイコン（R2 キー）。未設定なら null。 */
+	image: string | null;
 };
 
 export type FriendRequest = Friend & { createdAt: number };
@@ -40,7 +42,7 @@ export async function areFriends(db: D1Database, a: string, b: string): Promise<
 export async function listFriends(db: D1Database, userId: string): Promise<Friend[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", u."image"
 			 from "friendship" f
 			 join "user" u
 			   on u."id" = case when f."requesterId" = ?1 then f."addresseeId" else f."requesterId" end
@@ -60,7 +62,7 @@ export async function listIncomingRequests(
 ): Promise<FriendRequest[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", f."createdAt"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", u."image", f."createdAt"
 			 from "friendship" f
 			 join "user" u on u."id" = f."requesterId"
 			 where f."addresseeId" = ?1 and f."status" = 'pending'
@@ -78,7 +80,7 @@ export async function listOutgoingRequests(
 ): Promise<FriendRequest[]> {
 	const { results } = await db
 		.prepare(
-			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", f."createdAt"
+			`select u."id", u."name", coalesce(u."displayUsername", u."username") as "displayUsername", u."image", f."createdAt"
 			 from "friendship" f
 			 join "user" u on u."id" = f."addresseeId"
 			 where f."requesterId" = ?1 and f."status" = 'pending'

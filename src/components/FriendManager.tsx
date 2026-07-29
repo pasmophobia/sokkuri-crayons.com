@@ -7,6 +7,7 @@
 import { useState } from "react";
 
 import type { Friend, FriendRequest } from "../lib/friends";
+import { mediaUrl } from "../lib/media";
 
 type Props = {
 	friends: Friend[];
@@ -81,9 +82,12 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 					<ul className="people">
 						{incoming.map((person) => (
 							<li key={person.id}>
-								<span>
+								<span className="who">
+									<Avatar person={person} />
 									<strong>{person.name}</strong>{" "}
-									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
+									<span className="muted">
+										{person.displayUsername ? `@${person.displayUsername}` : ""}
+									</span>
 								</span>
 								<span className="actions">
 									<button
@@ -114,9 +118,12 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 					<ul className="people">
 						{outgoing.map((person) => (
 							<li key={person.id}>
-								<span>
+								<span className="who">
+									<Avatar person={person} />
 									<strong>{person.name}</strong>{" "}
-									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
+									<span className="muted">
+										{person.displayUsername ? `@${person.displayUsername}` : ""}
+									</span>
 								</span>
 								<button
 									type="button"
@@ -139,9 +146,12 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 					<ul className="people">
 						{friends.map((person) => (
 							<li key={person.id}>
-								<span>
+								<span className="who">
+									<Avatar person={person} />
 									<strong>{person.name}</strong>{" "}
-									<span className="muted">{person.displayUsername ? `@${person.displayUsername}` : ""}</span>
+									<span className="muted">
+										{person.displayUsername ? `@${person.displayUsername}` : ""}
+									</span>
 								</span>
 								<button
 									type="button"
@@ -156,5 +166,13 @@ export default function FriendManager({ friends, incoming, outgoing }: Props) {
 				)}
 			</section>
 		</div>
+	);
+}
+
+function Avatar({ person }: { person: Friend }) {
+	return person.image ? (
+		<img className="avatar" src={mediaUrl(person.image)} alt="" />
+	) : (
+		<span className="avatar avatar-blank">{person.name.slice(0, 1)}</span>
 	);
 }

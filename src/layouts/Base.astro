@@ -1,5 +1,6 @@
 ---
 import SignOutButton from "../components/SignOutButton";
+import { mediaUrl } from "../lib/media";
 import "../styles/global.css";
 
 interface Props {
@@ -26,7 +27,14 @@ const user = Astro.locals.user;
 						<>
 							<a href="/friends">フレンド</a>
 							<a href="/posts/new">投稿する</a>
-							<a class="muted" href="/settings">{user.name}</a>
+							<a class="me" href="/settings">
+								{user.image ? (
+									<img class="avatar" src={mediaUrl(user.image)} alt="" />
+								) : (
+									<span class="avatar avatar-blank">{user.name.slice(0, 1)}</span>
+								)}
+								<span class="muted">{user.name}</span>
+							</a>
 							<SignOutButton client:load />
 						</>
 					) : (
