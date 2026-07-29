@@ -247,7 +247,8 @@ export class Post extends Agent<Env, PostState> {
 					this.#send(connection, { type: "error", message: "no op to undo", ref: message.id });
 					return;
 				}
-				// TODO: 投稿者によるモデレーション（他人の op の削除）は別途。
+				// 取り消せるのは自分の op だけ。投稿者であっても他人の落書きは
+				// 消せない — 消せないことがこのサービスの性質。
 				if (target.authorId !== authorId) {
 					this.#send(connection, {
 						type: "error",
