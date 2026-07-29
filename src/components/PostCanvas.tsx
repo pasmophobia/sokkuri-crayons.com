@@ -45,10 +45,20 @@ const BLEND_MODES: { value: EditorSettings["blend"]; label: string }[] = [
 	{ value: "overlay", label: "オーバーレイ" },
 ];
 
+/**
+ * 描き上がるまでの見せ方。
+ *
+ * `loading` はサーバが返す markup の初期値でもある。JS が動かない場合は
+ * ここから動かないので、`Base.astro` の `<noscript>` がぼかしを外して
+ * 元画像をそのまま見せる。
+ */
+type Phase = "loading" | "ready";
+
 export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: Props) {
 	const editorRef = useRef<PostEditor | null>(null);
 
 	const [connected, setConnected] = useState(false);
+	const [phase, setPhase] = useState<Phase>("loading");
 	const [error, setError] = useState("");
 	const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
 
@@ -80,11 +90,13 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 	const mountCanvas = useCallback(
 		(canvas: HTMLCanvasElement | null) => {
 			if (!canvas) return;
+			setPhase("loading");
 
 			const editor = new PostEditor(canvas, {
 				getSettings: () => settingsRef.current,
 				send: (message) => agentRef.current.send(JSON.stringify(message)),
 				onError: setError,
+				onReady: () => setPhase("ready"),
 			});
 			editorRef.current = editor;
 
@@ -105,9 +117,17 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 
 	return (
 		<>
-			<p className="muted status-line">{connected ? "ライブ" : "接続中…"}</p>
+			<p className="muted status-line">
+				{phase === "loading" ? "読み込み中…" : connected ? "ライブ" : "接続中…"}
+			</p>
 
-			<div className="stage card">
+			<div className="stage card" data-phase={phase}>
+				{/*
+				 * 焼き上がるまでの下敷き。キャンバスが透けている間はこれが見える。
+				 * `crossOrigin` はエディタ側の Image と揃える。揃えないと同じ URL を
+				 * 2 回取りに行くことになる。
+				 */}
+				<img src={imageUrl} alt="" crossOrigin="anonymous" />
 				<canvas ref={mountCanvas} />
 			</div>
 
