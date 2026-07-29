@@ -151,17 +151,25 @@ button.primary {
 .feed {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	/* 縦は各カードの実比率にまかせる。行の高さに引き伸ばさない。 */
+	align-items: start;
 	gap: 1rem;
 	list-style: none;
 	padding: 0;
 	margin: 0;
 }
 
+/*
+ * 比率は投稿ごとに違うので、一律に切り抜かない。落書きは端に描かれることが
+ * 多く、cover で切ると「何が描かれたか」が一覧から消えてしまう。
+ * aspect-ratio は各要素が実比率をインラインで持つ（縦長すぎるものだけ
+ * max-height が効き、そのときは contain なので切れずに余白になる）。
+ */
 .feed img {
 	display: block;
 	width: 100%;
-	aspect-ratio: 4 / 3;
-	object-fit: cover;
+	max-height: 26rem;
+	object-fit: contain;
 	background: var(--surface-2);
 }
 

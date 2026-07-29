@@ -121,6 +121,8 @@ export class PostEditor {
 		this.#resize(Math.min(MAX_CANVAS_WIDTH, image.naturalWidth), aspectRatio);
 		this.#image = image;
 		this.#draw();
+		// 画像待ちで焼くのを見送っていた分をここで拾う。
+		this.#scheduleThumbnail(THUMBNAIL_DEBOUNCE_MS);
 	}
 
 	/** キャンバスの実ピクセル寸法を決める。幅を変えると中身は消えるので描き直す。 */
@@ -288,6 +290,11 @@ export class PostEditor {
 	async #pushThumbnail(): Promise<void> {
 		const postId = this.#options.postId;
 		if (!this.#thumbnailDirty) return;
+
+		// 元画像が載る前に焼くと、背景の抜けた既定寸法 (300x150) のサムネイルが
+		// 残る。しかも時刻だけは新しくなるので、以後どのクライアントも
+		// 古いとみなさず直しに来ない。画像が揃うまでは焼かない。
+		if (!this.#image) return;
 
 		// 待っている間に描画が rAF 待ちのまま止まっていることがある
 		// （背景タブでは rAF が回らない）。焼く直前に必ず追いつかせる。

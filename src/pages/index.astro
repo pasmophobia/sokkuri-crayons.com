@@ -37,6 +37,7 @@ const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeSty
 								}
 								alt={post.caption}
 								loading="lazy"
+								style={`aspect-ratio: ${post.aspectRatio}`}
 							/>
 							<div class="meta">
 								<div class="caption">{post.caption || "（キャプションなし）"}</div>
