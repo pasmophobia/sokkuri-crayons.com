@@ -19,11 +19,6 @@ export type Mail = {
 	text: string;
 };
 
-/** 差出人。Email Service に載せたドメインのアドレスでなければ送れない。 */
-function sender(env: Env): string {
-	return env.MAIL_FROM ?? "no-reply@example.com";
-}
-
 export async function sendMail(env: Env, mail: Mail): Promise<void> {
 	const binding = env.EMAIL;
 
@@ -39,7 +34,8 @@ export async function sendMail(env: Env, mail: Mail): Promise<void> {
 	try {
 		await binding.send({
 			to: mail.to,
-			from: sender(env),
+			// Email Service に載せたドメインのアドレスでなければ送れない。
+			from: env.MAIL_FROM,
 			subject: mail.subject,
 			html: mail.html,
 			text: mail.text,

@@ -32,7 +32,8 @@
 	// 実際に送るには Workers Paid と、Cloudflare DNS 上のドメインを
 	// Email Service に登録することが要る。
 	"send_email": [{ "name": "EMAIL" }],
-	"vars": { "MAIL_FROM": "no-reply@example.com" },
+	// 差出人。Email Service に登録したドメインのアドレスであること。
+	"vars": { "MAIL_FROM": "no-reply@sokkuri-crayons.com" },
 	"durable_objects": {
 		"bindings": [{ "name": "Post", "class_name": "Post" }],
 	},
