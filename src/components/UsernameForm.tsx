@@ -12,7 +12,10 @@ export default function UsernameForm({ current }: { current: string | null }) {
 
 	async function submit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		const username = String(new FormData(event.currentTarget).get("username") ?? "").trim();
+		// 他所から `@name` の形で貼られても通るようにする。
+		const username = String(new FormData(event.currentTarget).get("username") ?? "")
+			.trim()
+			.replace(/^@+/, "");
 		setPending(true);
 		setError("");
 
@@ -40,7 +43,7 @@ export default function UsernameForm({ current }: { current: string | null }) {
 					defaultValue={current ?? ""}
 					minLength={3}
 					maxLength={20}
-					pattern="[A-Za-z0-9_]+"
+					pattern="@?[A-Za-z0-9_]+"
 					required
 				/>
 			</label>

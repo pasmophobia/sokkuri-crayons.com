@@ -16,7 +16,7 @@ export default function SignUpForm() {
 			name: String(form.get("name")),
 			email: String(form.get("email")),
 			password: String(form.get("password")),
-			username: String(form.get("username")),
+			username: String(form.get("username")).trim().replace(/^@+/, ""),
 		});
 
 		if (failure) {
@@ -42,7 +42,7 @@ export default function SignUpForm() {
 					autoComplete="username"
 					minLength={3}
 					maxLength={20}
-					pattern="[A-Za-z0-9_]+"
+					pattern="@?[A-Za-z0-9_]+"
 					required
 				/>
 			</label>

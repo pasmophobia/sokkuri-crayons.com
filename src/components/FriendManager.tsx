@@ -65,7 +65,8 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 						<button
 							type="button"
 							onClick={async () => {
-								await navigator.clipboard.writeText(`@${myUsername}`);
+								// 表示は @ 付きでも、コピーするのは入力欄にそのまま貼れる素の形。
+								await navigator.clipboard.writeText(myUsername);
 								setCopied(true);
 								setTimeout(() => setCopied(false), 2000);
 							}}

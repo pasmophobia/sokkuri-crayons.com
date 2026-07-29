@@ -96,10 +96,17 @@ export type RequestOutcome =
 	| { ok: false; reason: string };
 
 /**
- * ユーザー名でフレンド申請を出す。
+ * 入力されたユーザー名を、保存されている形に合わせる。
  *
- * better-auth は username を小文字に正規化して保存するので、こちらも
- * 小文字にして引く（大小違いで別人扱いになると探せない）。
+ * 画面では handle らしく `@name` と見せているので、そのまま貼られることを
+ * 前提にする。保存されているのは `@` なしの小文字なので、ここで落として揃える。
+ */
+export function normalizeUsername(input: string): string {
+	return input.trim().replace(/^@+/, "").toLowerCase();
+}
+
+/**
+ * ユーザー名でフレンド申請を出す。
  *
  * 相手から先に申請が来ていた場合は、新しい行を作らずその場で成立させる
  * （すれ違いで 2 行できると、どちらも pending のまま止まってしまう）。
@@ -109,9 +116,12 @@ export async function requestFriendship(
 	requesterId: string,
 	username: string,
 ): Promise<RequestOutcome> {
+	const normalized = normalizeUsername(username);
+	if (normalized === "") return { ok: false, reason: "ユーザー名を入力してください" };
+
 	const target = await db
 		.prepare(`select "id" from "user" where "username" = ?1`)
-		.bind(username.trim().toLowerCase())
+		.bind(normalized)
 		.first<{ id: string }>();
 
 	if (!target) return { ok: false, reason: "そのユーザー名の人は見つかりません" };
