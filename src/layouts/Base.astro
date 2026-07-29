@@ -49,5 +49,34 @@ const user = Astro.locals.user;
 		<main>
 			<slot />
 		</main>
+		<footer class="site-footer">
+			<div class="footer-inner">
+				<div class="footer-about">
+					<span class="brand">そっくりクレヨン</span>
+					<p class="muted">
+						写真をなぞって落書きと歪みを重ね、フレンドと見せ合うための小さな場所です。
+					</p>
+				</div>
+				<nav class="footer-links">
+					<a href="/">タイムライン</a>
+					{
+						user ? (
+							<>
+								<a href="/posts/new">投稿する</a>
+								<a href="/friends">フレンド</a>
+								<a href="/settings">アカウント</a>
+							</>
+						) : (
+							<>
+								<a href="/signin">ログイン</a>
+								<a href="/signup">登録</a>
+							</>
+						)
+					}
+					<a href="/privacy">プライバシーポリシー</a>
+				</nav>
+			</div>
+			<p class="copyright">© 2026 pasmophobia. All rights reserved.</p>
+		</footer>
 	</body>
 </html>
