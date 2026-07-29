@@ -6,7 +6,7 @@
 		"global_fetch_strictly_public",
 		"nodejs_compat"
 	],
-	"name": "artc",
+	"name": "sokkuri-crayons",
 	// デプロイ先。複数アカウントに所属していると、これが無い場合に
 	// wrangler が非対話モードで選べず止まる。
 	"account_id": "d6f708ff17dcc5efdf24f852c65c4a6c",
