@@ -1,13 +1,17 @@
 import { useState } from "react";
 
+import { localePath, splitAroundLink, useTranslations, type Locale } from "../i18n";
 import { authClient } from "../lib/auth-client";
 
-export default function SignInForm() {
+export default function SignInForm({ locale }: { locale: Locale }) {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 	/** 未確認で弾かれたアドレス。確認メールを送り直せるように覚えておく。 */
 	const [unverified, setUnverified] = useState<string | null>(null);
 	const [resent, setResent] = useState(false);
+
+	const t = useTranslations(locale);
+	const [toSignUpBefore, toSignUpAfter] = splitAroundLink(t("signIn.toSignUp"));
 
 	async function submit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -26,14 +30,14 @@ export default function SignInForm() {
 		if (failure) {
 			if (failure.code === "EMAIL_NOT_VERIFIED") {
 				setUnverified(email);
-				setError("メールアドレスがまだ確認されていません。");
+				setError(t("signIn.unverified"));
 			} else {
-				setError(failure.message ?? "ログインできませんでした");
+				setError(failure.message ?? t("signIn.failed"));
 			}
 			setPending(false);
 			return;
 		}
-		location.href = "/";
+		location.href = localePath(locale, "/");
 	}
 
 	async function resend() {
@@ -41,7 +45,7 @@ export default function SignInForm() {
 		setPending(true);
 		await authClient.sendVerificationEmail({
 			email: unverified,
-			callbackURL: "/",
+			callbackURL: localePath(locale, "/"),
 		});
 		setResent(true);
 		setPending(false);
@@ -50,30 +54,32 @@ export default function SignInForm() {
 	return (
 		<form className="form" onSubmit={submit}>
 			<label>
-				メールアドレス
+				{t("signIn.email")}
 				<input type="email" name="email" autoComplete="email" required />
 			</label>
 			<label>
-				パスワード
+				{t("signIn.password")}
 				<input type="password" name="password" autoComplete="current-password" required />
 			</label>
 			<p className="error">{error}</p>
 			{unverified &&
 				(resent ? (
-					<p className="muted">確認メールを送り直しました。</p>
+					<p className="muted">{t("signIn.resent")}</p>
 				) : (
 					<button type="button" onClick={resend} disabled={pending}>
-						確認メールを送り直す
+						{t("signIn.resend")}
 					</button>
 				))}
 			<button className="primary" type="submit" disabled={pending}>
-				{pending ? "ログイン中…" : "ログイン"}
+				{pending ? t("signIn.pending") : t("signIn.submit")}
 			</button>
 			<p className="muted">
-				<a href="/forgot-password">パスワードを忘れた場合</a>
+				<a href={localePath(locale, "/forgot-password")}>{t("signIn.forgot")}</a>
 			</p>
 			<p className="muted">
-				アカウントがない場合は <a href="/signup">登録</a>。
+				{toSignUpBefore}
+				<a href={localePath(locale, "/signup")}>{t("nav.signUp")}</a>
+				{toSignUpAfter}
 			</p>
 		</form>
 	);

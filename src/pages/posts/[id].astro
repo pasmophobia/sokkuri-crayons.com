@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 
 import DeletePostButton from "../../components/DeletePostButton";
 import PostCanvas from "../../components/PostCanvas";
+import { dateFormatter, useTranslations } from "../../i18n";
 import Base from "../../layouts/Base.astro";
 import { mediaUrl } from "../../lib/media";
 import { getVisiblePost } from "../../lib/posts";
@@ -12,31 +13,35 @@ const user = Astro.locals.user;
 const post = id ? await getVisiblePost(env.DB, id, user?.id ?? null) : null;
 if (!post) return new Response(null, { status: 404, statusText: "Not Found" });
 
-const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" });
+const locale = Astro.locals.locale;
+const t = useTranslations(locale);
+const formatter = dateFormatter(locale, { dateStyle: "short", timeStyle: "short" });
+const authorName = post.authorName ?? t("common.anonymous");
 ---
 
-<Base title={post.caption || "投稿"}>
-	<h1>{post.caption || "（キャプションなし）"}</h1>
+<Base title={post.caption || t("post.title")}>
+	<h1>{post.caption || t("common.noCaption")}</h1>
 	<p class="byline">
 		{
 			post.authorImage ? (
 				<img class="avatar" src={mediaUrl(post.authorImage)} alt="" />
 			) : (
-				<span class="avatar avatar-blank">{post.authorName.slice(0, 1)}</span>
+				<span class="avatar avatar-blank">{authorName.slice(0, 1)}</span>
 			)
 		}
-		<span>{post.authorName}</span>
+		<span>{authorName}</span>
 		<span class="muted">{formatter.format(post.createdAt)}</span>
-		{post.visibility === "friends" && <span class="badge">フレンドのみ</span>}
+		{post.visibility === "friends" && <span class="badge">{t("post.friendsOnly")}</span>}
 	</p>
 
 	<PostCanvas
 		client:load
+		locale={locale}
 		postId={post.id}
 		imageUrl={mediaUrl(post.imageKey)}
 		aspectRatio={post.aspectRatio}
 		canEdit={user !== null}
 	/>
 
-	{user?.id === post.authorId && <DeletePostButton client:load postId={post.id} />}
+	{user?.id === post.authorId && <DeletePostButton client:load locale={locale} postId={post.id} />}
 </Base>

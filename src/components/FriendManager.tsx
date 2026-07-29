@@ -6,10 +6,12 @@
 
 import { useState } from "react";
 
+import { localePath, splitAroundLink, useTranslations, type Locale } from "../i18n";
 import type { Friend, FriendRequest } from "../lib/friends";
 import { mediaUrl } from "../lib/media";
 
 type Props = {
+	locale: Locale;
 	/** 自分のユーザー名。相手に伝えるために出す。未設定なら null。 */
 	myUsername: string | null;
 	friends: Friend[];
@@ -21,11 +23,14 @@ type Action =
 	| { action: "request"; username: string }
 	| { action: "accept" | "decline" | "remove"; userId: string };
 
-export default function FriendManager({ myUsername, friends, incoming, outgoing }: Props) {
+export default function FriendManager({ locale, myUsername, friends, incoming, outgoing }: Props) {
 	const [copied, setCopied] = useState(false);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
+
+	const t = useTranslations(locale);
+	const [unsetBefore, unsetAfter] = splitAroundLink(t("friends.usernameUnset"));
 
 	async function send(body: Action) {
 		setPending(true);
@@ -40,7 +45,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 
 		if (!response.ok) {
 			const failure = (await response.json().catch(() => null)) as { message?: string } | null;
-			setError(failure?.message ?? "処理できませんでした");
+			setError(failure?.message ?? t("friends.actionFailed"));
 			setPending(false);
 			return;
 		}
@@ -48,7 +53,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 		const result = (await response.json()) as { status?: string };
 		if (result.status === "pending") {
 			// 反映するものが無いので、その場で伝えて終わる。
-			setNotice("申請を送りました。相手の承認待ちです。");
+			setNotice(t("friends.requested"));
 			setPending(false);
 			return;
 		}
@@ -58,7 +63,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 	return (
 		<div className="friends">
 			<section>
-				<h2>あなたのユーザー名</h2>
+				<h2>{t("friends.myUsername")}</h2>
 				{myUsername ? (
 					<div className="my-username">
 						<code>@{myUsername}</code>
@@ -71,20 +76,21 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 								setTimeout(() => setCopied(false), 2000);
 							}}
 						>
-							{copied ? "コピーしました" : "コピー"}
+							{copied ? t("friends.copied") : t("friends.copy")}
 						</button>
 					</div>
 				) : (
 					<p className="muted">
-						まだ設定されていません。<a href="/settings">アカウント</a>で決めると、
-						相手から探してもらえるようになります。
+						{unsetBefore}
+						<a href={localePath(locale, "/settings")}>{t("friends.usernameUnsetLink")}</a>
+						{unsetAfter}
 					</p>
 				)}
-				<p className="muted">これを相手に伝えると、フレンド申請してもらえます。</p>
+				<p className="muted">{t("friends.shareHint")}</p>
 			</section>
 
 			<section>
-				<h2>フレンドを追加</h2>
+				<h2>{t("friends.add")}</h2>
 				<form
 					className="form"
 					onSubmit={(event) => {
@@ -94,11 +100,11 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 					}}
 				>
 					<label>
-						相手のユーザー名
+						{t("friends.theirUsername")}
 						<input type="text" name="username" placeholder="artist_123" required />
 					</label>
 					<button className="primary" type="submit" disabled={pending}>
-						申請する
+						{t("friends.request")}
 					</button>
 				</form>
 				<p className="error">{error}</p>
@@ -107,7 +113,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 
 			{incoming.length > 0 && (
 				<section>
-					<h2>届いている申請</h2>
+					<h2>{t("friends.incoming")}</h2>
 					<ul className="people">
 						{incoming.map((person) => (
 							<li key={person.id}>
@@ -125,14 +131,14 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 										disabled={pending}
 										onClick={() => void send({ action: "accept", userId: person.id })}
 									>
-										承認
+										{t("friends.accept")}
 									</button>
 									<button
 										type="button"
 										disabled={pending}
 										onClick={() => void send({ action: "decline", userId: person.id })}
 									>
-										拒否
+										{t("friends.decline")}
 									</button>
 								</span>
 							</li>
@@ -143,7 +149,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 
 			{outgoing.length > 0 && (
 				<section>
-					<h2>承認待ち</h2>
+					<h2>{t("friends.outgoing")}</h2>
 					<ul className="people">
 						{outgoing.map((person) => (
 							<li key={person.id}>
@@ -159,7 +165,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 									disabled={pending}
 									onClick={() => void send({ action: "remove", userId: person.id })}
 								>
-									取り消す
+									{t("friends.cancel")}
 								</button>
 							</li>
 						))}
@@ -168,9 +174,9 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 			)}
 
 			<section>
-				<h2>フレンド（{friends.length}）</h2>
+				<h2>{t("friends.list", { count: friends.length })}</h2>
 				{friends.length === 0 ? (
-					<p className="muted">まだフレンドがいません。</p>
+					<p className="muted">{t("friends.none")}</p>
 				) : (
 					<ul className="people">
 						{friends.map((person) => (
@@ -187,7 +193,7 @@ export default function FriendManager({ myUsername, friends, incoming, outgoing 
 									disabled={pending}
 									onClick={() => void send({ action: "remove", userId: person.id })}
 								>
-									解除
+									{t("friends.remove")}
 								</button>
 							</li>
 						))}

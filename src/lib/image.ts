@@ -9,7 +9,19 @@
  * 横倒しのまま保管されて後から回転して見える、という事故が起きない。
  */
 
+import type { MessageKey } from "../i18n";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "./media";
+
+/**
+ * 失敗の理由を文言の鍵で持つ。ここは言語を知らないので、文にするのは
+ * 呼び出し側（React 島）の仕事。
+ */
+export class ImageError extends Error {
+	constructor(readonly key: MessageKey) {
+		super(key);
+		this.name = "ImageError";
+	}
+}
 
 /** 長辺の上限。キャンバスに出すには十分で、回線にも優しい大きさ。 */
 export const MAX_IMAGE_EDGE = 2048;
@@ -27,7 +39,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error("画像を読み込めませんでした"));
+		image.onerror = () => reject(new ImageError("image.loadFailed"));
 		image.src = src;
 	});
 }
@@ -78,12 +90,12 @@ export async function fitForUpload(
 	canvas.height = plan.height;
 
 	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("画像を処理できませんでした");
+	if (!ctx) throw new ImageError("image.processFailed");
 	ctx.drawImage(image, 0, 0, plan.width, plan.height);
 
 	const blob = await new Promise<Blob | null>((resolve) =>
 		canvas.toBlob(resolve, plan.type, REENCODE_QUALITY),
 	);
-	if (!blob) throw new Error("画像を変換できませんでした");
+	if (!blob) throw new ImageError("image.convertFailed");
 	return { blob, type: plan.type };
 }

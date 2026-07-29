@@ -12,6 +12,7 @@
 
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { sendMail, template } from "../lib/mailer";
+import { DEFAULT_LOCALE, useTranslations, type Locale } from "../i18n";
 import { username } from "better-auth/plugins";
 import { withCloudflare } from "better-auth-cloudflare";
 
@@ -72,8 +73,16 @@ export function createAuth(options: {
 	cf?: IncomingRequestCfProperties | null;
 	/** リクエストの origin。Workers では `request.url` が実際の接続先を反映する。 */
 	baseURL?: string;
+	/**
+	 * 送るメールの言語。確認メールも再設定メールもリクエスト起点なので、
+	 * その時のロケール（middleware が `locals.locale` に載せたもの）を使う。
+	 * 利用者ごとに保存はしていない —— 保存すると「英語で登録したが今は日本語で
+	 * 使っている」人に古い方が届く。
+	 */
+	locale?: Locale;
 }) {
-	const { env, cf, baseURL } = options;
+	const { env, cf, baseURL, locale = DEFAULT_LOCALE } = options;
+	const t = useTranslations(locale);
 
 	return betterAuth({
 		baseURL,
@@ -98,13 +107,14 @@ export function createAuth(options: {
 					sendVerificationEmail: async ({ user, url }) => {
 						await sendMail(env, {
 							to: user.email,
-							subject: "メールアドレスの確認 | そっくりクレヨン",
+							subject: t("mail.verifySubject"),
 							...template({
-								heading: "メールアドレスを確認してください",
-								body: "そっくりクレヨンのアカウントを有効にするには、下のボタンを押してください。",
-								actionLabel: "確認する",
+								lang: locale,
+								heading: t("mail.verifyHeading"),
+								body: t("mail.verifyBody"),
+								actionLabel: t("mail.verifyAction"),
 								url,
-								note: "このリンクは 24 時間で切れます。心当たりがなければ、このメールは無視してください。",
+								note: t("mail.verifyNote"),
 							}),
 						});
 					},
@@ -114,13 +124,14 @@ export function createAuth(options: {
 					sendResetPassword: async ({ user, url }) => {
 						await sendMail(env, {
 							to: user.email,
-							subject: "パスワードの再設定 | そっくりクレヨン",
+							subject: t("mail.resetSubject"),
 							...template({
-								heading: "パスワードを再設定します",
-								body: "下のボタンから新しいパスワードを設定してください。",
-								actionLabel: "再設定する",
+								lang: locale,
+								heading: t("mail.resetHeading"),
+								body: t("mail.resetBody"),
+								actionLabel: t("mail.resetAction"),
 								url,
-								note: "心当たりがなければ、このメールは無視してください。パスワードは変わりません。",
+								note: t("mail.resetNote"),
 							}),
 						});
 					},

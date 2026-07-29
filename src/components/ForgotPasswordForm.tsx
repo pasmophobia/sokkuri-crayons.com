@@ -1,10 +1,12 @@
 import { useState } from "react";
 
+import { localePath, useTranslations, type Locale } from "../i18n";
 import { authClient } from "../lib/auth-client";
 
-export default function ForgotPasswordForm() {
+export default function ForgotPasswordForm({ locale }: { locale: Locale }) {
 	const [pending, setPending] = useState(false);
 	const [sent, setSent] = useState(false);
+	const t = useTranslations(locale);
 
 	async function submit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -13,7 +15,8 @@ export default function ForgotPasswordForm() {
 
 		await authClient.requestPasswordReset({
 			email,
-			redirectTo: `${location.origin}/reset-password`,
+			// 再設定ページも今の言語で開く。
+			redirectTo: `${location.origin}${localePath(locale, "/reset-password")}`,
 		});
 
 		// 成否を問わず同じ表示にする。ここで出し分けると、
@@ -23,25 +26,20 @@ export default function ForgotPasswordForm() {
 	}
 
 	if (sent) {
-		return (
-			<p className="muted">
-				再設定用のリンクを送りました。メールが届かない場合、そのアドレスは登録されていないか、
-				迷惑メールに振り分けられている可能性があります。
-			</p>
-		);
+		return <p className="muted">{t("forgot.sent")}</p>;
 	}
 
 	return (
 		<form className="form" onSubmit={submit}>
 			<label>
-				メールアドレス
+				{t("forgot.email")}
 				<input type="email" name="email" autoComplete="email" required />
 			</label>
 			<button className="primary" type="submit" disabled={pending}>
-				{pending ? "送信中…" : "再設定リンクを送る"}
+				{pending ? t("forgot.pending") : t("forgot.submit")}
 			</button>
 			<p className="muted">
-				<a href="/signin">ログインに戻る</a>
+				<a href={localePath(locale, "/signin")}>{t("forgot.backToSignIn")}</a>
 			</p>
 		</form>
 	);

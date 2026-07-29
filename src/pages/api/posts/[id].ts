@@ -3,6 +3,7 @@ import type { APIRoute } from "astro";
 import { getAgentByName } from "agents";
 
 import type { Post } from "../../../agents/post";
+import { useTranslations } from "../../../i18n";
 import { deletePost, getVisiblePost, isImageKeyUnused } from "../../../lib/posts";
 
 export const prerender = false;
@@ -24,7 +25,8 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
 	const post = id ? await getVisiblePost(env.DB, id, user.id) : null;
 	if (!post) return new Response(null, { status: 404 });
 	if (post.authorId !== user.id) {
-		return Response.json({ message: "自分の投稿だけ削除できます" }, { status: 403 });
+		const t = useTranslations(locals.locale);
+		return Response.json({ message: t("postsError.notOwner") }, { status: 403 });
 	}
 
 	if (!(await deletePost(env.DB, post.id, user.id))) {

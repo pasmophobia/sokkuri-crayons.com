@@ -1,9 +1,11 @@
 import { useState } from "react";
 
+import { localePath, useTranslations, type Locale } from "../i18n";
 import { authClient } from "../lib/auth-client";
 
-export default function SignOutButton() {
+export default function SignOutButton({ locale }: { locale: Locale }) {
 	const [pending, setPending] = useState(false);
+	const t = useTranslations(locale);
 
 	return (
 		<button
@@ -12,10 +14,10 @@ export default function SignOutButton() {
 			onClick={async () => {
 				setPending(true);
 				await authClient.signOut();
-				location.href = "/";
+				location.href = localePath(locale, "/");
 			}}
 		>
-			ログアウト
+			{t("nav.signOut")}
 		</button>
 	);
 }

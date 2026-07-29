@@ -8,10 +8,13 @@
 
 import { useState } from "react";
 
-export default function DeletePostButton({ postId }: { postId: string }) {
+import { localePath, useTranslations, type Locale } from "../i18n";
+
+export default function DeletePostButton({ locale, postId }: { locale: Locale; postId: string }) {
 	const [confirming, setConfirming] = useState(false);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
+	const t = useTranslations(locale);
 
 	async function remove() {
 		setPending(true);
@@ -20,19 +23,19 @@ export default function DeletePostButton({ postId }: { postId: string }) {
 		const response = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
 		if (!response.ok) {
 			const failure = (await response.json().catch(() => null)) as { message?: string } | null;
-			setError(failure?.message ?? "削除できませんでした");
+			setError(failure?.message ?? t("post.deleteFailed"));
 			setPending(false);
 			return;
 		}
 		// 消した投稿のページに留まっても 404 しかないので、一覧へ戻す。
-		location.assign("/");
+		location.assign(localePath(locale, "/"));
 	}
 
 	if (!confirming) {
 		return (
 			<div className="post-actions">
 				<button type="button" onClick={() => setConfirming(true)}>
-					削除
+					{t("post.delete")}
 				</button>
 			</div>
 		);
@@ -40,15 +43,13 @@ export default function DeletePostButton({ postId }: { postId: string }) {
 
 	return (
 		<div className="post-actions">
-			<p className="muted">
-				この投稿を削除します。重ねられた落書きもまとめて消え、元には戻せません。
-			</p>
+			<p className="muted">{t("post.deleteWarning")}</p>
 			<div className="actions">
 				<button className="danger" type="button" disabled={pending} onClick={() => void remove()}>
-					{pending ? "削除中…" : "削除する"}
+					{pending ? t("post.deleting") : t("post.deleteConfirm")}
 				</button>
 				<button type="button" disabled={pending} onClick={() => setConfirming(false)}>
-					やめる
+					{t("post.deleteCancel")}
 				</button>
 			</div>
 			<p className="error">{error}</p>

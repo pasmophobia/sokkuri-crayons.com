@@ -2,11 +2,15 @@
 import { env } from "cloudflare:workers";
 
 import FriendManager from "../components/FriendManager";
+import { localePath, useTranslations } from "../i18n";
 import Base from "../layouts/Base.astro";
 import { listFriends, listIncomingRequests, listOutgoingRequests } from "../lib/friends";
 
 const user = Astro.locals.user;
-if (!user) return Astro.redirect("/signin");
+const locale = Astro.locals.locale;
+if (!user) return Astro.redirect(localePath(locale, "/signin"));
+
+const t = useTranslations(locale);
 
 const [friends, incoming, outgoing, me] = await Promise.all([
 	listFriends(env.DB, user.id),
@@ -20,11 +24,12 @@ const [friends, incoming, outgoing, me] = await Promise.all([
 ]);
 ---
 
-<Base title="フレンド">
+<Base title={t("friends.title")}>
 	<div class="feed-page">
-		<h1>フレンド</h1>
+		<h1>{t("friends.title")}</h1>
 		<FriendManager
 			client:load
+			locale={locale}
 			myUsername={me?.username ?? null}
 			friends={friends}
 			incoming={incoming}

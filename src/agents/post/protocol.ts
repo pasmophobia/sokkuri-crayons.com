@@ -61,7 +61,15 @@ export type ServerMessage =
 	| { type: "op:committed"; op: CommittedOp }
 	| { type: "op:cancelled"; id: string }
 	| { type: "op:undone"; id: string }
-	| { type: "error"; message: string; ref?: string };
+	/**
+	 * `message` は開発者向けの英語。利用者に見せる価値のあるものだけ `code` を
+	 * 添えてあり、クライアントはそれを今の言語の文言に引き直す
+	 * （`src/components/PostCanvas.tsx`）。
+	 */
+	| { type: "error"; message: string; code?: ServerErrorCode; ref?: string };
+
+/** 利用者に見せるエラー。ここに無いものは開発者向けとして `message` が出る。 */
+export type ServerErrorCode = "post_not_public";
 
 export function encode(message: ServerMessage): string {
 	return JSON.stringify(message);

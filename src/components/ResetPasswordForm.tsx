@@ -1,16 +1,26 @@
 import { useState } from "react";
 
+import { localePath, splitAroundLink, useTranslations, type Locale } from "../i18n";
 import { authClient } from "../lib/auth-client";
 
-export default function ResetPasswordForm({ token }: { token: string | null }) {
+export default function ResetPasswordForm({
+	locale,
+	token,
+}: {
+	locale: Locale;
+	token: string | null;
+}) {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
+	const t = useTranslations(locale);
 
 	if (!token) {
+		const [before, after] = splitAroundLink(t("reset.badToken"));
 		return (
 			<p className="muted">
-				リンクが正しくないか、期限が切れています。
-				<a href="/forgot-password">もう一度送り直して</a>ください。
+				{before}
+				<a href={localePath(locale, "/forgot-password")}>{t("reset.badTokenLink")}</a>
+				{after}
 			</p>
 		);
 	}
@@ -23,19 +33,17 @@ export default function ResetPasswordForm({ token }: { token: string | null }) {
 
 		const { error: failure } = await authClient.resetPassword({ newPassword, token: token! });
 		if (failure) {
-			setError(
-				failure.message ?? "再設定できませんでした。リンクの期限が切れているかもしれません。",
-			);
+			setError(failure.message ?? t("reset.failed"));
 			setPending(false);
 			return;
 		}
-		location.href = "/signin?reset=1";
+		location.href = `${localePath(locale, "/signin")}?reset=1`;
 	}
 
 	return (
 		<form className="form" onSubmit={submit}>
 			<label>
-				新しいパスワード（8 文字以上）
+				{t("reset.password")}
 				<input
 					type="password"
 					name="newPassword"
@@ -46,7 +54,7 @@ export default function ResetPasswordForm({ token }: { token: string | null }) {
 			</label>
 			<p className="error">{error}</p>
 			<button className="primary" type="submit" disabled={pending}>
-				{pending ? "設定中…" : "この内容で設定する"}
+				{pending ? t("reset.pending") : t("reset.submit")}
 			</button>
 		</form>
 	);

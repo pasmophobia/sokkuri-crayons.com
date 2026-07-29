@@ -116,6 +116,14 @@ main {
 	gap: 0.35rem;
 }
 
+/* 言語切り替え。列は増えないので横並びのままにする。 */
+.footer-locales {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	font-size: 0.9rem;
+}
+
 .copyright {
 	max-width: 60rem;
 	margin: 1.75rem auto 0;

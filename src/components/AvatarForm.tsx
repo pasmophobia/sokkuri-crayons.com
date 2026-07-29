@@ -8,14 +8,24 @@
 
 import { useRef, useState } from "react";
 
+import { useTranslations, type Locale, type Translate } from "../i18n";
 import { authClient } from "../lib/auth-client";
-import { loadImage } from "../lib/image";
+import { ImageError, loadImage } from "../lib/image";
 import { AVATAR_SIZE, AVATAR_TYPE, mediaUrl } from "../lib/media";
 
-export default function AvatarForm({ current, name }: { current: string | null; name: string }) {
+export default function AvatarForm({
+	locale,
+	current,
+	name,
+}: {
+	locale: Locale;
+	current: string | null;
+	name: string;
+}) {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 	const input = useRef<HTMLInputElement>(null);
+	const t = useTranslations(locale);
 
 	async function pick(event: React.ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0];
@@ -32,15 +42,15 @@ export default function AvatarForm({ current, name }: { current: string | null; 
 			});
 			if (!upload.ok) {
 				const failure = (await upload.json().catch(() => null)) as { message?: string } | null;
-				throw new Error(failure?.message ?? "アップロードできませんでした");
+				throw new Error(failure?.message ?? t("account.avatarUploadFailed"));
 			}
 			const { key } = (await upload.json()) as { key: string };
 
 			const { error: failure } = await authClient.updateUser({ image: key });
-			if (failure) throw new Error(failure.message ?? "設定できませんでした");
+			if (failure) throw new Error(failure.message ?? t("account.avatarSetFailed"));
 			location.reload();
 		} catch (failure) {
-			setError(failure instanceof Error ? failure.message : "設定できませんでした");
+			setError(describe(failure, t, t("account.avatarSetFailed")));
 			setPending(false);
 			if (input.current) input.current.value = "";
 		}
@@ -51,7 +61,7 @@ export default function AvatarForm({ current, name }: { current: string | null; 
 		setError("");
 		const { error: failure } = await authClient.updateUser({ image: "" });
 		if (failure) {
-			setError(failure.message ?? "外せませんでした");
+			setError(failure.message ?? t("account.avatarClearFailed"));
 			setPending(false);
 			return;
 		}
@@ -67,7 +77,11 @@ export default function AvatarForm({ current, name }: { current: string | null; 
 			)}
 			<div className="avatar-actions">
 				<label className="file-button">
-					{pending ? "処理中…" : current ? "変更する" : "アイコンを設定"}
+					{pending
+						? t("account.avatarPending")
+						: current
+							? t("account.avatarChange")
+							: t("account.avatarSet")}
 					<input
 						ref={input}
 						type="file"
@@ -79,13 +93,19 @@ export default function AvatarForm({ current, name }: { current: string | null; 
 				</label>
 				{current && (
 					<button type="button" onClick={clear} disabled={pending}>
-						外す
+						{t("account.avatarClear")}
 					</button>
 				)}
 				<p className="error">{error}</p>
 			</div>
 		</div>
 	);
+}
+
+/** 例外を今の言語の一文にする。`ImageError` だけは鍵を持っているので引き直す。 */
+function describe(failure: unknown, t: Translate, fallback: string): string {
+	if (failure instanceof ImageError) return t(failure.key);
+	return failure instanceof Error ? failure.message : fallback;
 }
 
 /** 中央を正方形に切り出して AVATAR_SIZE に縮め、webp にする。 */
@@ -99,7 +119,7 @@ async function toSquareWebp(file: File): Promise<Blob> {
 		canvas.width = AVATAR_SIZE;
 		canvas.height = AVATAR_SIZE;
 		const ctx = canvas.getContext("2d");
-		if (!ctx) throw new Error("画像を処理できませんでした");
+		if (!ctx) throw new ImageError("image.processFailed");
 
 		ctx.drawImage(
 			image,
@@ -116,7 +136,7 @@ async function toSquareWebp(file: File): Promise<Blob> {
 		const blob = await new Promise<Blob | null>((resolve) =>
 			canvas.toBlob(resolve, AVATAR_TYPE, 0.9),
 		);
-		if (!blob) throw new Error("画像を変換できませんでした");
+		if (!blob) throw new ImageError("image.convertFailed");
 		return blob;
 	} finally {
 		URL.revokeObjectURL(url);

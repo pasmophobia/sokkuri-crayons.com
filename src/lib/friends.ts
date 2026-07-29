@@ -6,6 +6,8 @@
  * 「自分から申請したときだけフレンドに見える」というバグになる。
  */
 
+import type { MessageKey } from "../i18n";
+
 export type FriendshipStatus = "pending" | "accepted";
 
 export type Friend = {
@@ -91,7 +93,14 @@ export async function listOutgoingRequests(
 	return results;
 }
 
-export type RequestOutcome = { ok: true; status: FriendshipStatus } | { ok: false; reason: string };
+/**
+ * 断る理由。文にはせず文言の鍵で返す —— ここは言語を知らないし、
+ * 知る必要もない。文にするのは API 境界（`src/pages/api/friends.ts`）。
+ */
+export type RequestFailure = Extract<MessageKey, `friendsError.${string}`>;
+
+export type RequestOutcome =
+	{ ok: true; status: FriendshipStatus } | { ok: false; reason: RequestFailure };
 
 /**
  * 入力されたユーザー名を、保存されている形に合わせる。
@@ -115,15 +124,15 @@ export async function requestFriendship(
 	username: string,
 ): Promise<RequestOutcome> {
 	const normalized = normalizeUsername(username);
-	if (normalized === "") return { ok: false, reason: "ユーザー名を入力してください" };
+	if (normalized === "") return { ok: false, reason: "friendsError.usernameRequired" };
 
 	const target = await db
 		.prepare(`select "id" from "user" where "username" = ?1`)
 		.bind(normalized)
 		.first<{ id: string }>();
 
-	if (!target) return { ok: false, reason: "そのユーザー名の人は見つかりません" };
-	if (target.id === requesterId) return { ok: false, reason: "自分には申請できません" };
+	if (!target) return { ok: false, reason: "friendsError.notFound" };
+	if (target.id === requesterId) return { ok: false, reason: "friendsError.self" };
 
 	const existing = await db
 		.prepare(
@@ -135,10 +144,10 @@ export async function requestFriendship(
 		.first<{ requesterId: string; status: FriendshipStatus }>();
 
 	if (existing?.status === "accepted") {
-		return { ok: false, reason: "すでにフレンドです" };
+		return { ok: false, reason: "friendsError.already" };
 	}
 	if (existing?.requesterId === requesterId) {
-		return { ok: false, reason: "すでに申請済みです" };
+		return { ok: false, reason: "friendsError.pending" };
 	}
 	if (existing) {
 		// 相手からの申請が先に来ていた。折り返しの申請は承認とみなす。

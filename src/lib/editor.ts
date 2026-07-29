@@ -21,7 +21,8 @@ import type {
 	SubmittedOp,
 } from "../agents/post/ops";
 import { renderableOps } from "../agents/post/ops";
-import type { ClientMessage, ServerMessage } from "../agents/post/protocol";
+import type { ClientMessage, ServerErrorCode, ServerMessage } from "../agents/post/protocol";
+import { ImageError } from "./image";
 import { renderPost } from "./render";
 
 export type Tool = "stroke" | "displace" | "text";
@@ -53,7 +54,11 @@ export type EditorOptions = {
 	getSettings: () => EditorSettings;
 	/** サーバへ送る。実体は useAgent が返すソケット。 */
 	send: (message: ClientMessage) => void;
-	onError?: (message: string) => void;
+	/**
+	 * `message` はサーバから来る開発者向けの英語。`code` が付いていれば、
+	 * それを今の言語の文言に引き直して出すのは受け手の仕事。
+	 */
+	onError?: (message: string, code?: ServerErrorCode) => void;
 };
 
 /** 点の送信をまとめる間隔。ここを短くすると滑らかになるが通信量が増える。 */
@@ -102,7 +107,7 @@ export class PostEditor {
 		image.crossOrigin = "anonymous";
 		await new Promise<void>((resolve, reject) => {
 			image.onload = () => resolve();
-			image.onerror = () => reject(new Error("画像を読み込めませんでした"));
+			image.onerror = () => reject(new ImageError("image.loadFailed"));
 			image.src = url;
 		});
 
@@ -190,7 +195,7 @@ export class PostEditor {
 			}
 
 			case "error":
-				this.#options.onError?.(message.message);
+				this.#options.onError?.(message.message, message.code);
 				// 自分の op が弾かれたら、手元のライブ表示も畳む。
 				if (message.ref && this.#active?.id === message.ref) this.#abandonActive();
 				return;

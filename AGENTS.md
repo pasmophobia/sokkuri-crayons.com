@@ -122,6 +122,46 @@ Sign-in requires a verified address. Accounts created before verification
 existed were marked verified in `0007_grandfather_verified.sql` so they were
 not locked out.
 
+## Languages
+
+Japanese (default) and English. `src/i18n/ja.ts` is the source of truth for the
+key set; `src/i18n/en.ts` is typed as `Messages` (derived from `ja`), so a
+missing or stale key fails `astro check` rather than silently rendering nothing.
+
+Astro's built-in i18n routing is deliberately off. It expects one page file per
+non-default locale, which at this size means keeping `src/pages/` twice. Instead
+`src/middleware.ts` resolves the locale and rewrites `/en/...` down to `/...`, so
+there is one set of pages. It puts two things on `Astro.locals`:
+
+- `locale` — the resolved locale.
+- `path` — the pathname with the prefix removed. `Astro.url` is already
+  rewritten, so use this when building links back out (the language switcher and
+  the `hreflang` alternates both do).
+
+Japanese has no URL prefix; English lives under `/en`. Precedence is URL >
+cookie > `Accept-Language`. The negotiation redirect fires only when no `locale`
+cookie exists, so it never overrides a choice someone has made; the cookie is
+rewritten from whichever prefix they actually landed on.
+
+React islands are separate roots, so there is no provider to inherit from — each
+one takes a `locale` prop and calls `useTranslations` itself. Both dictionaries
+ship to the browser; at two locales that is cheaper than splitting them.
+
+Copy that a lib produces does not get translated in the lib. `src/lib/friends.ts`
+returns message keys, `src/lib/image.ts` throws `ImageError` carrying a key, and
+the `Post` agent tags user-facing failures with a `code` — in each case the
+request boundary or the island turns it into a sentence. Everything else the
+agent sends over the socket stays English: it is developer-facing.
+
+Mail is built per request from `locals.locale` (`createAuth({ locale })`), not
+from a stored preference. Verification and reset mail are both request-driven, so
+the language someone is reading the site in is the right one to send.
+
+`{name}` in a message is interpolation. `{link}` is the one special case: it
+marks where a link goes in a sentence whose word order differs between the two
+languages, and `splitAroundLink()` cuts the string in two for JSX. Placeholders
+are checked across locales in `src/i18n/i18n.test.ts`.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build

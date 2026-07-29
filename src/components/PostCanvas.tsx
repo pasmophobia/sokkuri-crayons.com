@@ -14,10 +14,19 @@ import { useAgent } from "agents/react";
 import { useCallback, useRef, useState } from "react";
 
 import type { PostState } from "../agents/post/ops";
-import { LIMITS } from "../agents/post/protocol";
+import { LIMITS, type ServerErrorCode } from "../agents/post/protocol";
+import {
+	localePath,
+	splitAroundLink,
+	useTranslations,
+	type Locale,
+	type MessageKey,
+	type Translate,
+} from "../i18n";
 import { DEFAULT_SETTINGS, PostEditor, type EditorSettings } from "../lib/editor";
 
 type Props = {
+	locale: Locale;
 	postId: string;
 	imageUrl: string;
 	aspectRatio: number;
@@ -25,32 +34,45 @@ type Props = {
 	canEdit: boolean;
 };
 
-const TOOLS: { value: EditorSettings["tool"]; label: string }[] = [
-	{ value: "stroke", label: "落書き" },
-	{ value: "displace", label: "歪み" },
-	{ value: "text", label: "文字" },
+/** 利用者に見せるサーバエラーの対応表。ここに無いものは英語のまま出る。 */
+const SERVER_ERRORS: Record<ServerErrorCode, MessageKey> = {
+	post_not_public: "canvas.errorPostNotPublic",
+};
+
+const TOOLS: { value: EditorSettings["tool"]; label: MessageKey }[] = [
+	{ value: "stroke", label: "canvas.toolStroke" },
+	{ value: "displace", label: "canvas.toolDisplace" },
+	{ value: "text", label: "canvas.toolText" },
 ];
 
-const DISPLACE_MODES: { value: EditorSettings["displaceMode"]; label: string }[] = [
-	{ value: "smudge", label: "なすりつけ" },
-	{ value: "bulge", label: "膨らみ" },
-	{ value: "pinch", label: "へこみ" },
-	{ value: "swirl", label: "渦" },
+const DISPLACE_MODES: { value: EditorSettings["displaceMode"]; label: MessageKey }[] = [
+	{ value: "smudge", label: "canvas.displaceSmudge" },
+	{ value: "bulge", label: "canvas.displaceBulge" },
+	{ value: "pinch", label: "canvas.displacePinch" },
+	{ value: "swirl", label: "canvas.displaceSwirl" },
 ];
 
-const BLEND_MODES: { value: EditorSettings["blend"]; label: string }[] = [
-	{ value: "normal", label: "通常" },
-	{ value: "multiply", label: "乗算" },
-	{ value: "screen", label: "スクリーン" },
-	{ value: "overlay", label: "オーバーレイ" },
+const BLEND_MODES: { value: EditorSettings["blend"]; label: MessageKey }[] = [
+	{ value: "normal", label: "canvas.blendNormal" },
+	{ value: "multiply", label: "canvas.blendMultiply" },
+	{ value: "screen", label: "canvas.blendScreen" },
+	{ value: "overlay", label: "canvas.blendOverlay" },
 ];
 
-export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: Props) {
+export default function PostCanvas({ locale, postId, imageUrl, aspectRatio, canEdit }: Props) {
 	const editorRef = useRef<PostEditor | null>(null);
 
 	const [connected, setConnected] = useState(false);
 	const [error, setError] = useState("");
 	const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
+
+	const t = useTranslations(locale);
+	const [signInBefore, signInAfter] = splitAroundLink(t("canvas.signInToEdit"));
+
+	// t は毎回作り直されるので、ref 越しに最新を見せる（下の ref コールバックは
+	// imageUrl が変わらないかぎり作り直さない）。
+	const translateRef = useRef<Translate>(t);
+	translateRef.current = t;
 
 	// 設定は React が正。エンジンは点を置くたびに読みに来るので、
 	// effect で流し込むのではなく ref 越しに最新を見せる。
@@ -84,12 +106,14 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 			const editor = new PostEditor(canvas, {
 				getSettings: () => settingsRef.current,
 				send: (message) => agentRef.current.send(JSON.stringify(message)),
-				onError: setError,
+				// サーバの文言は開発者向けの英語。code が付いているものだけ引き直す。
+				onError: (message, code) =>
+					setError(code ? translateRef.current(SERVER_ERRORS[code]) : message),
 			});
 			editorRef.current = editor;
 
 			editor.loadImage(imageUrl, aspectRatio).catch(() => {
-				setError("画像を読み込めませんでした。");
+				setError(translateRef.current("canvas.imageLoadFailed"));
 			});
 
 			return () => {
@@ -105,7 +129,7 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 
 	return (
 		<>
-			<p className="muted status-line">{connected ? "ライブ" : "接続中…"}</p>
+			<p className="muted status-line">{connected ? t("canvas.live") : t("canvas.connecting")}</p>
 
 			<div className="stage card">
 				<canvas ref={mountCanvas} />
@@ -114,14 +138,14 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 			{canEdit ? (
 				<div className="toolbar card">
 					<label>
-						道具
+						{t("canvas.tool")}
 						<select
 							value={settings.tool}
 							onChange={(event) => update("tool", event.target.value as EditorSettings["tool"])}
 						>
 							{TOOLS.map((tool) => (
 								<option key={tool.value} value={tool.value}>
-									{tool.label}
+									{t(tool.label)}
 								</option>
 							))}
 						</select>
@@ -130,7 +154,7 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 					{settings.tool === "displace" && (
 						<>
 							<label>
-								歪み方
+								{t("canvas.displaceMode")}
 								<select
 									value={settings.displaceMode}
 									onChange={(event) =>
@@ -139,13 +163,13 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 								>
 									{DISPLACE_MODES.map((mode) => (
 										<option key={mode.value} value={mode.value}>
-											{mode.label}
+											{t(mode.label)}
 										</option>
 									))}
 								</select>
 							</label>
 							<label>
-								強さ
+								{t("canvas.strength")}
 								<input
 									type="range"
 									min={-1}
@@ -160,7 +184,7 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 
 					{settings.tool !== "displace" && (
 						<label>
-							色
+							{t("canvas.color")}
 							<input
 								type="color"
 								value={settings.color}
@@ -171,14 +195,14 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 
 					{settings.tool === "stroke" && (
 						<label>
-							合成
+							{t("canvas.blend")}
 							<select
 								value={settings.blend}
 								onChange={(event) => update("blend", event.target.value as EditorSettings["blend"])}
 							>
 								{BLEND_MODES.map((blend) => (
 									<option key={blend.value} value={blend.value}>
-										{blend.label}
+										{t(blend.label)}
 									</option>
 								))}
 							</select>
@@ -187,11 +211,11 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 
 					{settings.tool === "text" && (
 						<label>
-							文字
+							{t("canvas.text")}
 							<input
 								type="text"
 								maxLength={LIMITS.MAX_TEXT_LENGTH}
-								placeholder="置きたい文字"
+								placeholder={t("canvas.textPlaceholder")}
 								value={settings.text}
 								onChange={(event) => update("text", event.target.value)}
 							/>
@@ -199,7 +223,7 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 					)}
 
 					<label>
-						{settings.tool === "displace" ? "半径" : "太さ"}
+						{settings.tool === "displace" ? t("canvas.radius") : t("canvas.thickness")}
 						<input
 							type="range"
 							min={0.002}
@@ -211,12 +235,14 @@ export default function PostCanvas({ postId, imageUrl, aspectRatio, canEdit }: P
 					</label>
 
 					<button type="button" onClick={() => editorRef.current?.undo()}>
-						取り消す
+						{t("canvas.undo")}
 					</button>
 				</div>
 			) : (
 				<p className="muted">
-					<a href="/signin">ログイン</a>すると、この画像に落書きや歪みを加えられます。
+					{signInBefore}
+					<a href={localePath(locale, "/signin")}>{t("nav.signIn")}</a>
+					{signInAfter}
 				</p>
 			)}
 

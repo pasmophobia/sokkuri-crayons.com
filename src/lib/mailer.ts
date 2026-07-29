@@ -50,18 +50,20 @@ export async function sendMail(env: Env, mail: Mail): Promise<void> {
 
 /** 本文の体裁。文面が増えても崩れないよう 1 か所にまとめておく。 */
 export function template(options: {
+	/** 本文の言語。読み上げと折り返しのために `<html lang>` に載せる。 */
+	lang: string;
 	heading: string;
 	body: string;
 	actionLabel: string;
 	url: string;
 	note: string;
 }): { html: string; text: string } {
-	const { heading, body, actionLabel, url, note } = options;
+	const { lang, heading, body, actionLabel, url, note } = options;
 
 	return {
 		text: `${heading}\n\n${body}\n\n${actionLabel}: ${url}\n\n${note}`,
 		html: `<!doctype html>
-<html lang="ja"><body style="font-family:sans-serif;line-height:1.7;color:#16161d">
+<html lang="${lang}"><body style="font-family:sans-serif;line-height:1.7;color:#16161d">
 <h1 style="font-size:1.2rem">${heading}</h1>
 <p>${body}</p>
 <p><a href="${url}" style="display:inline-block;padding:10px 18px;background:#ff0066;color:#fff;border-radius:8px;text-decoration:none">${actionLabel}</a></p>

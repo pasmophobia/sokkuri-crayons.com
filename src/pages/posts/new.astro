@@ -2,16 +2,19 @@
 import { env } from "cloudflare:workers";
 
 import NewPostForm from "../../components/NewPostForm";
+import { localePath, useTranslations } from "../../i18n";
 import Base from "../../layouts/Base.astro";
 import { listFriends } from "../../lib/friends";
 
 const user = Astro.locals.user;
-if (!user) return Astro.redirect("/signin");
+const locale = Astro.locals.locale;
+if (!user) return Astro.redirect(localePath(locale, "/signin"));
 
+const t = useTranslations(locale);
 const friends = await listFriends(env.DB, user.id);
 ---
 
-<Base title="投稿する">
-	<h1>投稿する</h1>
-	<NewPostForm client:load friendCount={friends.length} />
+<Base title={t("newPost.title")}>
+	<h1>{t("newPost.title")}</h1>
+	<NewPostForm client:load locale={locale} friendCount={friends.length} />
 </Base>

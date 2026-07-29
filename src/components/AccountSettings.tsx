@@ -8,9 +8,11 @@
 
 import { useState } from "react";
 
+import { useTranslations, type Locale, type MessageKey, type Translate } from "../i18n";
 import { authClient } from "../lib/auth-client";
 
 type Props = {
+	locale: Locale;
 	name: string;
 	username: string | null;
 	email: string;
@@ -19,52 +21,60 @@ type Props = {
 type Result = { ok: true } | { ok: false; message: string };
 
 /**
- * better-auth のエラーは英語で返るので、よくあるものだけ日本語にする。
+ * better-auth のエラーは英語で返る。よくあるものだけ辞書に文言を持っていて、
  * 未知のコードは元の文言をそのまま出す（黙って握り潰すより手掛かりが残る）。
  */
-const MESSAGES: Record<string, string> = {
-	INVALID_PASSWORD: "現在のパスワードが違います",
-	PASSWORD_TOO_SHORT: "パスワードが短すぎます",
-	PASSWORD_TOO_LONG: "パスワードが長すぎます",
-	USERNAME_IS_ALREADY_TAKEN: "そのユーザー名はすでに使われています",
-	INVALID_USERNAME: "ユーザー名に使えない文字が含まれています",
-	USERNAME_TOO_SHORT: "ユーザー名が短すぎます",
-	USERNAME_TOO_LONG: "ユーザー名が長すぎます",
-	INVALID_EMAIL: "メールアドレスの形式が正しくありません",
-	USER_ALREADY_EXISTS: "そのメールアドレスは使えません",
-};
+const KNOWN_CODES = [
+	"INVALID_PASSWORD",
+	"PASSWORD_TOO_SHORT",
+	"PASSWORD_TOO_LONG",
+	"USERNAME_IS_ALREADY_TAKEN",
+	"INVALID_USERNAME",
+	"USERNAME_TOO_SHORT",
+	"USERNAME_TOO_LONG",
+	"INVALID_EMAIL",
+	"USER_ALREADY_EXISTS",
+] as const;
 
-function describe(error: { code?: string; message?: string } | null, fallback: string): string {
+function describe(
+	t: Translate,
+	error: { code?: string; message?: string } | null,
+	fallback: string,
+): string {
 	if (!error) return fallback;
-	return (error.code && MESSAGES[error.code]) || error.message || fallback;
+	const known = KNOWN_CODES.find((code) => code === error.code);
+	if (known) return t(`authError.${known}` satisfies MessageKey);
+	return error.message || fallback;
 }
 
-export default function AccountSettings({ name, username, email }: Props) {
+export default function AccountSettings({ locale, name, username, email }: Props) {
+	const t = useTranslations(locale);
+
 	return (
 		<>
 			<Section
-				title="表示名"
-				description="投稿やフレンド一覧に出る名前です。重複してもかまいません。"
-				submitLabel="変更する"
+				title={t("account.nameSection")}
+				description={t("account.nameDescription")}
+				submitLabel={t("account.change")}
 				onSubmit={async (form) => {
 					const value = String(form.get("name") ?? "").trim();
-					if (value === "") return { ok: false, message: "表示名を入力してください" };
+					if (value === "") return { ok: false, message: t("account.nameRequired") };
 					const { error } = await authClient.updateUser({ name: value });
 					return error
-						? { ok: false, message: describe(error, "変更できませんでした") }
+						? { ok: false, message: describe(t, error, t("account.changeFailed")) }
 						: { ok: true };
 				}}
 			>
 				<label>
-					表示名
+					{t("account.displayName")}
 					<input type="text" name="name" defaultValue={name} maxLength={40} required />
 				</label>
 			</Section>
 
 			<Section
-				title="ユーザー名"
-				description="フレンドを探してもらうときに相手へ伝える名前です。"
-				submitLabel={username ? "変更する" : "設定する"}
+				title={t("account.usernameSection")}
+				description={t("account.usernameDescription")}
+				submitLabel={username ? t("account.change") : t("account.set")}
 				onSubmit={async (form) => {
 					// 他所から `@name` の形で貼られても通るようにする。
 					const value = String(form.get("username") ?? "")
@@ -76,12 +86,12 @@ export default function AccountSettings({ name, username, email }: Props) {
 						displayUsername: value,
 					});
 					return error
-						? { ok: false, message: describe(error, "そのユーザー名は使えません") }
+						? { ok: false, message: describe(t, error, t("account.usernameRejected")) }
 						: { ok: true };
 				}}
 			>
 				<label>
-					ユーザー名（英数字と _、3〜20 文字）
+					{t("account.usernameField")}
 					<input
 						type="text"
 						name="username"
@@ -95,20 +105,20 @@ export default function AccountSettings({ name, username, email }: Props) {
 			</Section>
 
 			<Section
-				title="メールアドレス"
-				description="ログインに使うアドレスです。確認メールは送られず、その場で切り替わります。"
-				submitLabel="変更する"
+				title={t("account.emailSection")}
+				description={t("account.emailDescription")}
+				submitLabel={t("account.change")}
 				onSubmit={async (form) => {
 					const value = String(form.get("email") ?? "").trim();
-					if (value === email) return { ok: false, message: "現在のアドレスと同じです" };
+					if (value === email) return { ok: false, message: t("account.emailUnchanged") };
 					const { error } = await authClient.changeEmail({ newEmail: value });
 					return error
-						? { ok: false, message: describe(error, "変更できませんでした") }
+						? { ok: false, message: describe(t, error, t("account.changeFailed")) }
 						: { ok: true };
 				}}
 			>
 				<label>
-					メールアドレス
+					{t("account.email")}
 					<input type="email" name="email" defaultValue={email} required />
 				</label>
 				{/*
@@ -116,17 +126,14 @@ export default function AccountSettings({ name, username, email }: Props) {
 				  「そのアドレスは存在する」と教えないために成功を返し、実際には
 				  切り替えない。利用者が黙って戸惑わないよう先に断っておく。
 				*/}
-				<p className="muted">
-					すでに他の人が使っているアドレスは、そのままでは切り替わりません。
-					変更後に表示が変わっていなければ、そのアドレスは使えません。
-				</p>
+				<p className="muted">{t("account.emailTakenNote")}</p>
 			</Section>
 
 			<Section
-				title="パスワード"
-				submitLabel="変更する"
+				title={t("account.passwordSection")}
+				submitLabel={t("account.change")}
 				reloadOnSuccess={false}
-				successMessage="パスワードを変更しました。他の端末のログインは解除されています。"
+				successMessage={t("account.passwordChanged")}
 				onSubmit={async (form) => {
 					const currentPassword = String(form.get("currentPassword") ?? "");
 					const newPassword = String(form.get("newPassword") ?? "");
@@ -137,16 +144,16 @@ export default function AccountSettings({ name, username, email }: Props) {
 						revokeOtherSessions: true,
 					});
 					return error
-						? { ok: false, message: describe(error, "現在のパスワードが違います") }
+						? { ok: false, message: describe(t, error, t("authError.INVALID_PASSWORD")) }
 						: { ok: true };
 				}}
 			>
 				<label>
-					現在のパスワード
+					{t("account.currentPassword")}
 					<input type="password" name="currentPassword" autoComplete="current-password" required />
 				</label>
 				<label>
-					新しいパスワード（8 文字以上）
+					{t("account.newPassword")}
 					<input
 						type="password"
 						name="newPassword"

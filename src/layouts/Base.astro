@@ -1,5 +1,6 @@
 ---
 import SignOutButton from "../components/SignOutButton";
+import { LOCALES, LOCALE_LABELS, localePath, useTranslations } from "../i18n";
 import { mediaUrl } from "../lib/media";
 import "../styles/global.css";
 
@@ -9,25 +10,40 @@ interface Props {
 
 const { title } = Astro.props;
 const user = Astro.locals.user;
+const locale = Astro.locals.locale;
+const t = useTranslations(locale);
+
+/** このロケールでのリンク先。 */
+const p = (path: string) => localePath(locale, path);
 ---
 
 <!doctype html>
-<html lang="ja">
+<html lang={locale}>
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>{title} | そっくりクレヨン</title>
+		<title>{title} | {t("common.brand")}</title>
+		{/* 同じ内容の別言語版を検索エンジンに伝える。パスは middleware が剥がす前のもの。 */}
+		{
+			LOCALES.map((other) => (
+				<link
+					rel="alternate"
+					hreflang={other}
+					href={new URL(localePath(other, Astro.locals.path), Astro.url).href}
+				/>
+			))
+		}
 	</head>
 	<body>
 		<header class="site-header">
-			<a class="brand" href="/">そっくりクレヨン</a>
+			<a class="brand" href={p("/")}>{t("common.brand")}</a>
 			<nav>
 				{
 					user ? (
 						<>
-							<a href="/friends">フレンド</a>
-							<a href="/posts/new">投稿する</a>
-							<a class="me" href="/settings">
+							<a href={p("/friends")}>{t("nav.friends")}</a>
+							<a href={p("/posts/new")}>{t("nav.newPost")}</a>
+							<a class="me" href={p("/settings")}>
 								{user.image ? (
 									<img class="avatar" src={mediaUrl(user.image)} alt="" />
 								) : (
@@ -35,12 +51,12 @@ const user = Astro.locals.user;
 								)}
 								<span class="muted">{user.name}</span>
 							</a>
-							<SignOutButton client:load />
+							<SignOutButton client:load locale={locale} />
 						</>
 					) : (
 						<>
-							<a href="/signin">ログイン</a>
-							<a href="/signup">登録</a>
+							<a href={p("/signin")}>{t("nav.signIn")}</a>
+							<a href={p("/signup")}>{t("nav.signUp")}</a>
 						</>
 					)
 				}
@@ -52,28 +68,47 @@ const user = Astro.locals.user;
 		<footer class="site-footer">
 			<div class="footer-inner">
 				<div class="footer-about">
-					<span class="brand">そっくりクレヨン</span>
-					<p class="muted">
-						写真をなぞって落書きと歪みを重ね、フレンドと見せ合うための小さな場所です。
-					</p>
+					<span class="brand">{t("common.brand")}</span>
+					<p class="muted">{t("footer.tagline")}</p>
 				</div>
 				<nav class="footer-links">
-					<a href="/">タイムライン</a>
+					<a href={p("/")}>{t("nav.timeline")}</a>
 					{
 						user ? (
 							<>
-								<a href="/posts/new">投稿する</a>
-								<a href="/friends">フレンド</a>
-								<a href="/settings">アカウント</a>
+								<a href={p("/posts/new")}>{t("nav.newPost")}</a>
+								<a href={p("/friends")}>{t("nav.friends")}</a>
+								<a href={p("/settings")}>{t("nav.account")}</a>
 							</>
 						) : (
 							<>
-								<a href="/signin">ログイン</a>
-								<a href="/signup">登録</a>
+								<a href={p("/signin")}>{t("nav.signIn")}</a>
+								<a href={p("/signup")}>{t("nav.signUp")}</a>
 							</>
 						)
 					}
-					<a href="/privacy">プライバシーポリシー</a>
+					<a href={p("/privacy")}>{t("nav.privacy")}</a>
+				</nav>
+				{
+					/*
+				  いま見ているページのまま言語だけ差し替える。middleware が
+				  接頭辞の有無から Cookie を書き直すので、次からはその言語で開く。
+				*/
+				}
+				<nav class="footer-locales" aria-label={t("common.language")}>
+					{
+						LOCALES.map((other) =>
+							other === locale ? (
+								<span class="muted" aria-current="true">
+									{LOCALE_LABELS[other]}
+								</span>
+							) : (
+								<a href={localePath(other, Astro.locals.path)} hreflang={other} lang={other}>
+									{LOCALE_LABELS[other]}
+								</a>
+							),
+						)
+					}
 				</nav>
 			</div>
 			<p class="copyright">© 2026 pasmophobia. All rights reserved.</p>

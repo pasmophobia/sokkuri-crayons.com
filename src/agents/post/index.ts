@@ -132,7 +132,11 @@ export class Post extends Agent<Env, PostState> {
 		// 張られる前に弾く。ここまで来た時点では SDK が `cf_agent_state` を
 		// 送り終えているので、ここだけでは情報漏れを止められない。
 		if (!(await this.#mayView(identity.userId))) {
-			this.#send(connection, { type: "error", message: "この投稿は公開されていません" });
+			this.#send(connection, {
+				type: "error",
+				message: "this post is not public",
+				code: "post_not_public",
+			});
 			connection.close(4403, "forbidden");
 			return;
 		}
@@ -201,7 +205,8 @@ export class Post extends Agent<Env, PostState> {
 			this.#flushTimer = null;
 		}
 		for (const connection of this.getConnections()) {
-			connection.close(4404, "この投稿は削除されました");
+			// close の理由は画面には出ない（利用者は再読み込みで 404 を見る）。
+			connection.close(4404, "post deleted");
 		}
 		await this.destroy();
 	}

@@ -1,11 +1,15 @@
 ---
 import SignUpForm from "../components/SignUpForm";
+import { localePath, useTranslations } from "../i18n";
 import Base from "../layouts/Base.astro";
 
-if (Astro.locals.user) return Astro.redirect("/");
+const locale = Astro.locals.locale;
+if (Astro.locals.user) return Astro.redirect(localePath(locale, "/"));
+
+const t = useTranslations(locale);
 ---
 
-<Base title="登録">
-	<h1>アカウント登録</h1>
-	<SignUpForm client:load />
+<Base title={t("nav.signUp")}>
+	<h1>{t("signUp.title")}</h1>
+	<SignUpForm client:load locale={locale} />
 </Base>

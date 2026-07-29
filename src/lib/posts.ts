@@ -8,7 +8,11 @@ import type { PostMeta, Visibility } from "../agents/post/ops";
 /** 一覧・詳細で使う投稿 1 件（投稿者の表示名を join 済み）。 */
 export type PostRow = PostMeta & {
 	id: string;
-	authorName: string;
+	/**
+	 * 投稿者の表示名。未設定なら null。
+	 * 代わりに何と出すかは表示側が決める（文言は言語で変わるため）。
+	 */
+	authorName: string | null;
 	/** 投稿者のアイコン（R2 キー）。未設定なら null。 */
 	authorImage: string | null;
 };
@@ -52,7 +56,7 @@ function toRow(record: PostRecord): PostRow {
 	return {
 		id: record.id,
 		authorId: record.authorId,
-		authorName: record.authorName ?? "名無し",
+		authorName: record.authorName,
 		authorImage: record.authorImage,
 		imageKey: record.imageKey,
 		aspectRatio: record.aspectRatio,

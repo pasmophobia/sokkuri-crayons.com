@@ -1,11 +1,15 @@
 ---
 import SignInForm from "../components/SignInForm";
+import { localePath, useTranslations } from "../i18n";
 import Base from "../layouts/Base.astro";
 
-if (Astro.locals.user) return Astro.redirect("/");
+const locale = Astro.locals.locale;
+if (Astro.locals.user) return Astro.redirect(localePath(locale, "/"));
+
+const t = useTranslations(locale);
 ---
 
-<Base title="ログイン">
-	<h1>ログイン</h1>
-	<SignInForm client:load />
+<Base title={t("signIn.title")}>
+	<h1>{t("signIn.title")}</h1>
+	<SignInForm client:load locale={locale} />
 </Base>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Visibility } from "../agents/post/ops";
-import { MAX_SOURCE_BYTES, fitForUpload, loadImage } from "../lib/image";
+import { localePath, splitAroundLink, useTranslations, type Locale, type Translate } from "../i18n";
+import { ImageError, MAX_SOURCE_BYTES, fitForUpload, loadImage } from "../lib/image";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../lib/media";
 
 /** アップロードする実体と、そこから測ったアスペクト比・プレビュー URL。 */
@@ -10,13 +11,22 @@ type Picked = { blob: Blob; type: string; aspectRatio: number; previewUrl: strin
 const ACCEPT = Object.keys(ALLOWED_IMAGE_TYPES).join(",");
 const MAX_MB = Math.round(MAX_SOURCE_BYTES / 1024 / 1024);
 
-export default function NewPostForm({ friendCount }: { friendCount: number }) {
+export default function NewPostForm({
+	locale,
+	friendCount,
+}: {
+	locale: Locale;
+	friendCount: number;
+}) {
 	// 既定はフレンドのみ。うっかり全世界に出るより、狭い方に倒す。
 	const [visibility, setVisibility] = useState<Visibility>("friends");
 	const [picked, setPicked] = useState<Picked | null>(null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 	const [hasCamera, setHasCamera] = useState(false);
+
+	const t = useTranslations(locale);
+	const [noFriendsBefore, noFriendsAfter] = splitAroundLink(t("newPost.noFriendsNote"));
 
 	// プレビュー用の object URL。差し替えのたびに前のものを開放する。
 	// （残った分は文書の破棄時にブラウザが回収するので、effect は要らない。）
@@ -41,7 +51,7 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 		if (!file) return;
 
 		if (file.size > MAX_SOURCE_BYTES) {
-			setError("画像が大きすぎます");
+			setError(t("image.tooLarge"));
 			return;
 		}
 
@@ -55,7 +65,7 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 			const probe = await loadImage(previewUrl);
 			const { blob, type } = await fitForUpload(file, probe);
 			// 縮めてもなお収まらないもの（動く gif など）は、送る前に断る。
-			if (blob.size > MAX_UPLOAD_BYTES) throw new Error("画像が大きすぎます");
+			if (blob.size > MAX_UPLOAD_BYTES) throw new ImageError("image.tooLarge");
 			setPicked({
 				blob,
 				type,
@@ -65,7 +75,7 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 		} catch (failure) {
 			URL.revokeObjectURL(previewUrl);
 			previewUrlRef.current = null;
-			setError(failure instanceof Error ? failure.message : "画像を読み込めませんでした");
+			setError(describe(failure, t, t("image.loadFailed")));
 		} finally {
 			setPending(false);
 		}
@@ -77,7 +87,7 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 		const caption = String(new FormData(event.currentTarget).get("caption") ?? "");
 
 		setPending(true);
-		setError("アップロード中…");
+		setError(t("newPost.uploading"));
 
 		try {
 			// 1. 実体を R2 に上げてキーをもらう
@@ -86,11 +96,11 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 				headers: { "content-type": picked.type },
 				body: picked.blob,
 			});
-			if (!upload.ok) throw await message(upload, "アップロードできませんでした");
+			if (!upload.ok) throw await message(upload, t("newPost.uploadFailed"));
 			const { key } = (await upload.json()) as { key: string };
 
 			// 2. そのキーで投稿レコードを作る
-			setError("投稿中…");
+			setError(t("newPost.posting"));
 			const created = await fetch("/api/posts", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
@@ -101,12 +111,12 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 					visibility,
 				}),
 			});
-			if (!created.ok) throw await message(created, "投稿できませんでした");
+			if (!created.ok) throw await message(created, t("newPost.postFailed"));
 
 			const { id } = (await created.json()) as { id: string };
-			location.href = `/posts/${id}`;
+			location.href = localePath(locale, `/posts/${id}`);
 		} catch (failure) {
-			setError(failure instanceof Error ? failure.message : "投稿できませんでした");
+			setError(describe(failure, t, t("newPost.postFailed")));
 			setPending(false);
 		}
 	}
@@ -114,11 +124,11 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 	return (
 		<form className="form" onSubmit={submit}>
 			<div className="field">
-				<span>画像</span>
+				<span>{t("newPost.image")}</span>
 				<div className="pick-actions">
 					{hasCamera && (
 						<label className="file-button">
-							カメラで撮る
+							{t("newPost.camera")}
 							<input
 								type="file"
 								accept={ACCEPT}
@@ -130,44 +140,49 @@ export default function NewPostForm({ friendCount }: { friendCount: number }) {
 						</label>
 					)}
 					<label className="file-button">
-						{hasCamera ? "写真を選ぶ" : "画像を選ぶ"}
+						{hasCamera ? t("newPost.choosePhoto") : t("newPost.chooseImage")}
 						<input type="file" accept={ACCEPT} onChange={pick} disabled={pending} hidden />
 					</label>
 				</div>
-				<p className="muted">大きい写真は縮めて送ります（{MAX_MB}MB まで）。</p>
+				<p className="muted">{t("newPost.sizeNote", { mb: MAX_MB })}</p>
 			</div>
 			<label>
-				キャプション
+				{t("newPost.caption")}
 				<textarea name="caption" rows={3} maxLength={280} />
 			</label>
 			<label>
-				公開範囲
+				{t("newPost.visibility")}
 				<select
 					value={visibility}
 					onChange={(event) => setVisibility(event.target.value as Visibility)}
 				>
-					<option value="friends">フレンドのみ</option>
-					<option value="public">全体公開</option>
+					<option value="friends">{t("newPost.visibilityFriends")}</option>
+					<option value="public">{t("newPost.visibilityPublic")}</option>
 				</select>
 			</label>
 			{visibility === "friends" && friendCount === 0 && (
 				<p className="muted">
-					いまフレンドがいないので、この投稿は自分だけが見られます。
-					<a href="/friends">フレンドを追加</a>すると共有されます。
+					{noFriendsBefore}
+					<a href={localePath(locale, "/friends")}>{t("newPost.noFriendsNoteLink")}</a>
+					{noFriendsAfter}
 				</p>
 			)}
 			<p className="error">{error}</p>
 			{picked && <img className="preview" src={picked.previewUrl} alt="" />}
 			<button className="primary" type="submit" disabled={!picked || pending}>
-				投稿する
+				{t("newPost.submit")}
 			</button>
 			<p className="muted">
-				{visibility === "public"
-					? "投稿すると、誰でもこの画像に落書きや歪みを加えられます。"
-					: "フレンドだけが閲覧でき、落書きや歪みを加えられます。"}
+				{visibility === "public" ? t("newPost.publicNote") : t("newPost.friendsNote")}
 			</p>
 		</form>
 	);
+}
+
+/** 例外を今の言語の一文にする。`ImageError` だけは鍵を持っているので引き直す。 */
+function describe(failure: unknown, t: Translate, fallback: string): string {
+	if (failure instanceof ImageError) return t(failure.key);
+	return failure instanceof Error ? failure.message : fallback;
 }
 
 async function message(response: Response, fallback: string): Promise<Error> {

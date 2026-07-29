@@ -3,10 +3,14 @@ import { env } from "cloudflare:workers";
 
 import AccountSettings from "../components/AccountSettings";
 import AvatarForm from "../components/AvatarForm";
+import { dateFormatter, localePath, useTranslations } from "../i18n";
 import Base from "../layouts/Base.astro";
 
 const user = Astro.locals.user;
-if (!user) return Astro.redirect("/signin");
+const locale = Astro.locals.locale;
+if (!user) return Astro.redirect(localePath(locale, "/signin"));
+
+const t = useTranslations(locale);
 
 const account = await env.DB.prepare(
 	`select u."name", u."email", u."image", u."createdAt",
@@ -29,40 +33,45 @@ const account = await env.DB.prepare(
 	}>();
 
 const joined = account?.createdAt ? new Date(account.createdAt) : null;
-const formatter = new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" });
+const formatter = dateFormatter(locale, { dateStyle: "long" });
 ---
 
-<Base title="アカウント">
+<Base title={t("account.title")}>
 	<div class="feed-page">
-		<h1>アカウント</h1>
+		<h1>{t("account.title")}</h1>
 
 		{
 			account && (
 				<>
 					<section class="card account">
-						<AvatarForm client:load current={account.image} name={account.name} />
+						<AvatarForm client:load locale={locale} current={account.image} name={account.name} />
 						<dl>
-							<dt>表示名</dt>
+							<dt>{t("account.displayName")}</dt>
 							<dd>{account.name}</dd>
-							<dt>ユーザー名</dt>
+							<dt>{t("account.username")}</dt>
 							<dd>
-								{account.username ? `@${account.username}` : <span class="muted">未設定</span>}
+								{account.username ? (
+									`@${account.username}`
+								) : (
+									<span class="muted">{t("account.usernameUnset")}</span>
+								)}
 							</dd>
-							<dt>メールアドレス</dt>
+							<dt>{t("account.email")}</dt>
 							<dd>{account.email}</dd>
-							<dt>登録日</dt>
+							<dt>{t("account.joined")}</dt>
 							<dd>{joined ? formatter.format(joined) : "—"}</dd>
-							<dt>投稿</dt>
+							<dt>{t("account.posts")}</dt>
 							<dd>{account.posts}</dd>
-							<dt>フレンド</dt>
+							<dt>{t("account.friends")}</dt>
 							<dd>
-								<a href="/friends">{account.friends}</a>
+								<a href={localePath(locale, "/friends")}>{account.friends}</a>
 							</dd>
 						</dl>
 					</section>
 
 					<AccountSettings
 						client:load
+						locale={locale}
 						name={account.name}
 						username={account.username}
 						email={account.email}
