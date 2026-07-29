@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../lib/media";
 
@@ -13,11 +13,9 @@ export default function NewPostForm() {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState("");
 
-	// プレビュー用の object URL は差し替え・離脱のたびに開放する。
-	useEffect(() => {
-		if (!picked) return;
-		return () => URL.revokeObjectURL(picked.previewUrl);
-	}, [picked]);
+	// プレビュー用の object URL。差し替えのたびに前のものを開放する。
+	// （残った分は文書の破棄時にブラウザが回収するので、effect は要らない。）
+	const previewUrlRef = useRef<string | null>(null);
 
 	async function pick(event: React.ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0];
@@ -30,13 +28,17 @@ export default function NewPostForm() {
 			return;
 		}
 
+		if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
 		const previewUrl = URL.createObjectURL(file);
+		previewUrlRef.current = previewUrl;
+
 		try {
 			// op は正規化座標なので、実座標に戻すのにアスペクト比が要る。
 			const probe = await loadImage(previewUrl);
 			setPicked({ file, previewUrl, aspectRatio: probe.naturalWidth / probe.naturalHeight });
 		} catch {
 			URL.revokeObjectURL(previewUrl);
+			previewUrlRef.current = null;
 			setError("画像を読み込めませんでした");
 		}
 	}

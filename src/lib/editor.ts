@@ -1,11 +1,14 @@
 /**
- * 投稿ページのクライアント側コントローラ。
+ * 投稿ページの描画エンジン。
  *
- * Post Agent と WebSocket で繋ぎ、
- *   - `hello` で初期状態を受け取り
- *   - `op:*` の差分でライブ更新し
- *   - `cf_agent_state` （サーバの flush）が来たら丸ごと同期し直す
- * という流れで committed / pending を持つ。描画は rAF でまとめる。
+ * 接続そのものは持たない。WebSocket の面倒は `useAgent` (agents/react) が見て、
+ * こちらは受け取ったフレームを `receive()` / `sync()` から流し込まれるだけ。
+ * ここが抱えるのは、React の state に載せると 1 点ごとに再レンダリングが
+ * 走ってしまう高頻度な部分 —— op の集合、ポインタ入力、キャンバス描画 —— に限る。
+ *
+ *   - `hello`  … 初期状態
+ *   - `op:*`   … 差分でライブ更新
+ *   - `sync()` … サーバの flush (`cf_agent_state`) で丸ごと同期し直す
  */
 
 import type {
@@ -46,10 +49,15 @@ export const DEFAULT_SETTINGS: EditorSettings = {
 	text: "",
 };
 
-export type EditorEvents = {
-	onIdentity?: (userId: string | null, displayName: string | null) => void;
+export type EditorOptions = {
+	postId: string;
+	/** サムネイルを最後に焼いた時刻（サーバ時刻）。null なら未生成。 */
+	thumbnailUpdatedAt: number | null;
+	/** 描く直前に呼ばれる。設定は React 側が持つので、常に最新を読みに行く。 */
+	getSettings: () => EditorSettings;
+	/** サーバへ送る。実体は useAgent が返すソケット。 */
+	send: (message: ClientMessage) => void;
 	onError?: (message: string) => void;
-	onStatus?: (status: "connecting" | "open" | "closed") => void;
 };
 
 /** 点の送信をまとめる間隔。ここを短くすると滑らかになるが通信量が増える。 */
@@ -62,8 +70,7 @@ export class PostEditor {
 	#canvas: HTMLCanvasElement;
 	#ctx: CanvasRenderingContext2D;
 	#image: HTMLImageElement | null = null;
-	#socket: WebSocket | null = null;
-	#events: EditorEvents;
+	#options: EditorOptions;
 
 	#committed = new Map<string, CommittedOp>();
 	#pending = new Map<string, SubmittedOp>();
@@ -74,21 +81,18 @@ export class PostEditor {
 	#outbox: Point[] = [];
 	#extendTimer: ReturnType<typeof setInterval> | null = null;
 	#frame = 0;
-	#postId: string | null = null;
 	#thumbnailTimer: ReturnType<typeof setTimeout> | null = null;
 	/** サーバのサムネイルに未反映の変更があるか。焼けたら下ろす。 */
 	#thumbnailDirty = false;
-	/** サムネイルを最後に焼いた時刻（サーバ時刻）。null なら未生成。 */
-	#thumbnailUpdatedAt: number | null = null;
+	#thumbnailUpdatedAt: number | null;
 
-	settings: EditorSettings = { ...DEFAULT_SETTINGS };
-
-	constructor(canvas: HTMLCanvasElement, events: EditorEvents = {}) {
+	constructor(canvas: HTMLCanvasElement, options: EditorOptions) {
 		this.#canvas = canvas;
 		const ctx = canvas.getContext("2d", { willReadFrequently: true });
 		if (!ctx) throw new Error("2d context is unavailable");
 		this.#ctx = ctx;
-		this.#events = events;
+		this.#options = options;
+		this.#thumbnailUpdatedAt = options.thumbnailUpdatedAt;
 		this.#bindPointer();
 	}
 
@@ -114,31 +118,16 @@ export class PostEditor {
 		this.#draw();
 	}
 
-	connect(postId: string, thumbnailUpdatedAt: number | null = null): void {
-		this.#postId = postId;
-		this.#thumbnailUpdatedAt = thumbnailUpdatedAt;
-		this.#events.onStatus?.("connecting");
-		const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-		const socket = new WebSocket(`${scheme}//${location.host}/agents/post/${postId}`);
-		this.#socket = socket;
-
-		socket.addEventListener("open", () => this.#events.onStatus?.("open"));
-		socket.addEventListener("close", () => {
-			this.#events.onStatus?.("closed");
-			this.#stopExtendTimer();
-		});
-		socket.addEventListener("message", (event) => {
-			if (typeof event.data !== "string") return;
-			this.#receive(JSON.parse(event.data));
-		});
-	}
-
-	disconnect(): void {
+	/** キャンバスから離れるときに、抱えているタイマーを落とす。 */
+	dispose(): void {
 		this.#stopExtendTimer();
 		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
 		this.#thumbnailTimer = null;
-		this.#socket?.close();
-		this.#socket = null;
+	}
+
+	/** 接続が切れたとき。送っても届かないので点の送出を止める。 */
+	suspend(): void {
+		this.#stopExtendTimer();
 	}
 
 	/** 自分の直近の op を取り消す。 */
@@ -148,22 +137,36 @@ export class PostEditor {
 
 	// --- 受信 ---
 
-	#receive(message: ServerMessage | { type: "cf_agent_state"; state: PostState }): void {
+	/** useAgent の onMessage から。プロトコル外のフレームは黙って捨てる。 */
+	receive(raw: unknown): void {
+		if (typeof raw !== "string") return;
+		let message: ServerMessage;
+		try {
+			message = JSON.parse(raw) as ServerMessage;
+		} catch {
+			return;
+		}
+		this.#receive(message);
+	}
+
+	/**
+	 * useAgent の onStateUpdate から。サーバが state を flush したときの全体同期で、
+	 * 差分を取りこぼしてもここで必ず追いつく。
+	 */
+	sync(state: PostState): void {
+		this.#sync(state);
+	}
+
+	#receive(message: ServerMessage): void {
 		switch (message.type) {
 			case "hello": {
 				this.#userId = message.you;
-				this.#events.onIdentity?.(message.you, message.displayName);
 				this.#sync(message.state);
 				// サムネイルより新しい op があるなら、開いた時点で焼き直す。
 				// これがないと、編集した本人が去ったあと誰も焼き直さない。
 				if (this.#thumbnailIsStale()) this.#markThumbnailStale();
 				return;
 			}
-			// サーバが state を flush したときの全体同期。差分を取りこぼしても
-			// ここで必ず追いつく。
-			case "cf_agent_state":
-				this.#sync(message.state);
-				return;
 
 			case "op:began":
 				this.#pending.set(message.op.id, message.op);
@@ -194,7 +197,7 @@ export class PostEditor {
 			}
 
 			case "error":
-				this.#events.onError?.(message.message);
+				this.#options.onError?.(message.message);
 				// 自分の op が弾かれたら、手元のライブ表示も畳む。
 				if (message.ref && this.#active?.id === message.ref) this.#abandonActive();
 				return;
@@ -262,7 +265,7 @@ export class PostEditor {
 	 * 出し直す（焼けたら #thumbnailDirty が下りて止まる）。
 	 */
 	#scheduleThumbnail(delayMs: number): void {
-		if (!this.signedIn || !this.#postId || !this.#thumbnailDirty) return;
+		if (!this.signedIn || !this.#thumbnailDirty) return;
 		if (this.#thumbnailTimer !== null) clearTimeout(this.#thumbnailTimer);
 		this.#thumbnailTimer = setTimeout(() => {
 			this.#thumbnailTimer = null;
@@ -271,8 +274,8 @@ export class PostEditor {
 	}
 
 	async #pushThumbnail(): Promise<void> {
-		const postId = this.#postId;
-		if (!postId || !this.#thumbnailDirty) return;
+		const postId = this.#options.postId;
+		if (!this.#thumbnailDirty) return;
 
 		// 待っている間に描画が rAF 待ちのまま止まっていることがある
 		// （背景タブでは rAF が回らない）。焼く直前に必ず追いつかせる。
@@ -348,7 +351,7 @@ export class PostEditor {
 	}
 
 	#beginOp(point: Point): void {
-		const { tool, color, size, blend, displaceMode, strength, text } = this.settings;
+		const { tool, color, size, blend, displaceMode, strength, text } = this.#options.getSettings();
 
 		let payload: OpPayload;
 		if (tool === "stroke") {
@@ -428,7 +431,6 @@ export class PostEditor {
 	}
 
 	#send(message: ClientMessage): void {
-		if (this.#socket?.readyState !== WebSocket.OPEN) return;
-		this.#socket.send(JSON.stringify(message));
+		this.#options.send(message);
 	}
 }

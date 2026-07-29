@@ -1,14 +1,19 @@
 /**
  * 投稿ページのキャンバス島。
  *
+ * 接続は `useAgent` (agents/react) が持つ。再接続・state 同期・URL 組み立てを
+ * 任せられるので、自前の WebSocket と接続用の useEffect が要らなくなる。
+ *
  * op の状態そのものは React が持たない。1 ストロークで何十回も点が増えるので、
  * それを state に載せると点ごとに再描画が走ってしまう。高頻度な部分は
  * `PostEditor`（命令的なエンジン）に閉じ込め、React が持つのは UI が実際に
  * 出し分けに使う粗い状態 —— 接続状況・エラー・道具の設定 —— だけにしている。
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useAgent } from "agents/react";
+import { useCallback, useRef, useState } from "react";
 
+import type { PostState } from "../agents/post/ops";
 import { LIMITS } from "../agents/post/protocol";
 import { DEFAULT_SETTINGS, PostEditor, type EditorSettings } from "../lib/editor";
 
@@ -19,14 +24,6 @@ type Props = {
 	thumbnailUpdatedAt: number | null;
 	/** 未ログインなら閲覧のみ。道具は出さない。 */
 	canEdit: boolean;
-};
-
-type Status = "connecting" | "open" | "closed";
-
-const STATUS_LABEL: Record<Status, string> = {
-	connecting: "接続中…",
-	open: "ライブ",
-	closed: "切断",
 };
 
 const TOOLS: { value: EditorSettings["tool"]; label: string }[] = [
@@ -56,51 +53,71 @@ export default function PostCanvas({
 	thumbnailUpdatedAt,
 	canEdit,
 }: Props) {
-	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const editorRef = useRef<PostEditor | null>(null);
 
-	const [status, setStatus] = useState<Status>("connecting");
+	const [connected, setConnected] = useState(false);
 	const [error, setError] = useState("");
 	const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
 
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
+	// 設定は React が正。エンジンは点を置くたびに読みに来るので、
+	// effect で流し込むのではなく ref 越しに最新を見せる。
+	const settingsRef = useRef(settings);
+	settingsRef.current = settings;
 
-		// setState 系は識別子が安定しているので、そのままハンドラに渡してよい。
-		const editor = new PostEditor(canvas, {
-			onStatus: setStatus,
-			onError: setError,
-		});
-		editorRef.current = editor;
+	const agent = useAgent<PostState>({
+		agent: "post",
+		name: postId,
+		onOpen: () => {
+			setConnected(true);
+			setError("");
+		},
+		onClose: () => {
+			setConnected(false);
+			editorRef.current?.suspend();
+		},
+		onMessage: (event) => editorRef.current?.receive(event.data),
+		onStateUpdate: (state) => editorRef.current?.sync(state),
+	});
 
-		editor
-			.loadImage(imageUrl, aspectRatio)
-			.catch(() => setError("画像を読み込めませんでした。"));
-		editor.connect(postId, thumbnailUpdatedAt);
+	// ref コールバックの中で組み立てて、その場で後始末も返す（React 19）。
+	// canvas 要素が要るだけの処理に useEffect を挟む必要はない。
+	const agentRef = useRef(agent);
+	agentRef.current = agent;
 
-		return () => {
-			editor.disconnect();
-			editorRef.current = null;
-		};
-	}, [postId, imageUrl, aspectRatio, thumbnailUpdatedAt]);
+	const mountCanvas = useCallback(
+		(canvas: HTMLCanvasElement | null) => {
+			if (!canvas) return;
 
-	// 設定は React 側が正。変わるたびにエンジンへ流し込む。
-	useEffect(() => {
-		if (editorRef.current) editorRef.current.settings = settings;
-	}, [settings]);
+			const editor = new PostEditor(canvas, {
+				postId,
+				thumbnailUpdatedAt,
+				getSettings: () => settingsRef.current,
+				send: (message) => agentRef.current.send(JSON.stringify(message)),
+				onError: setError,
+			});
+			editorRef.current = editor;
+
+			editor.loadImage(imageUrl, aspectRatio).catch(() => {
+				setError("画像を読み込めませんでした。");
+			});
+
+			return () => {
+				editor.dispose();
+				editorRef.current = null;
+			};
+		},
+		[postId, imageUrl, aspectRatio, thumbnailUpdatedAt],
+	);
 
 	const update = <K extends keyof EditorSettings>(key: K, value: EditorSettings[K]) =>
 		setSettings((current) => ({ ...current, [key]: value }));
 
 	return (
 		<>
-			<p className="muted status-line">
-				<span>{STATUS_LABEL[status]}</span>
-			</p>
+			<p className="muted status-line">{connected ? "ライブ" : "接続中…"}</p>
 
 			<div className="stage card">
-				<canvas ref={canvasRef} />
+				<canvas ref={mountCanvas} />
 			</div>
 
 			{canEdit ? (
